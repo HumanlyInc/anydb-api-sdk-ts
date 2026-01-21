@@ -1,0 +1,29 @@
+# Source files
+src/
+tsconfig.json
+.eslintrc.json
+
+# Tests
+**/*.test.ts
+**/*.spec.ts
+coverage/
+
+# Development
+.git/
+.gitignore
+node_modules/
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# CI/CD
+.github/
+
+# Documentation source (keep compiled README)
+docs/
+
+# Examples
+examples/
