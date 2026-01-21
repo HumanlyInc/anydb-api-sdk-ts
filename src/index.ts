@@ -13,17 +13,18 @@ export type {
   ADB,
   CreateRecordParams,
   UpdateRecordParams,
+  RemoveRecordParams,
   SearchRecordsParams,
   DownloadFileParams,
   DownloadFileResponse,
   GetUploadUrlParams,
   GetUploadUrlResponse,
   CompleteUploadParams,
-  CompleteUploadResponse,
   AnyDBClientConfig,
 } from "./types.js";
 export {
   PredefinedTemplateAdoIds,
   ADOCellValueType,
   ADOCellFormat,
+  NULL_OBJECTID,
 } from "./types.js";

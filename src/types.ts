@@ -2,6 +2,9 @@
  * Type definitions for AnyDB SDK
  */
 
+// Special Object IDs
+export const NULL_OBJECTID = "000000000000000000000000";
+
 // Predefined Template IDs
 export enum PredefinedTemplateAdoIds {
   FILE_TEMPLATE_ADOID = "222222222222222222222222",
@@ -135,6 +138,13 @@ export interface UpdateRecordParams {
     };
   };
   content?: ADOContent | Record<string, ADOCellUpdate>;
+}
+
+export interface RemoveRecordParams {
+  adoid: string;
+  adbid: string;
+  teamid: string;
+  removefromids: string; // Comma-separated parent ADOIDs, or NULL_OBJECTID to delete
 }
 
 export interface SearchRecordsParams {

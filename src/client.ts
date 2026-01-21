@@ -11,6 +11,7 @@ import type {
   ADB,
   CreateRecordParams,
   UpdateRecordParams,
+  RemoveRecordParams,
   SearchRecordsParams,
   DownloadFileParams,
   DownloadFileResponse,
@@ -192,6 +193,24 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(`Failed to update record: ${response.message}`);
+  }
+
+  /**
+   * Remove or delete a record
+   * @param params.adoid - Record ID to remove
+   * @param params.adbid - Database ID
+   * @param params.teamid - Team ID
+   * @param params.removefromids - Comma-separated parent ADOIDs to remove from, or NULL_OBJECTID to delete completely
+   */
+  async removeRecord(params: RemoveRecordParams): Promise<boolean> {
+    const response = await this.client.delete("/integrations/ext/remove", {
+      data: params,
+    });
+    console.log("Response = ", response.data);
+    if (response.data.status === "success") {
+      return true;
+    }
+    throw new Error(`Failed to remove record: ${response.message}`);
   }
 
   /**

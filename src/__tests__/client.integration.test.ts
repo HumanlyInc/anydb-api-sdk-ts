@@ -14,7 +14,7 @@
  */
 
 import { AnyDBClient } from "../client";
-import { ADOCellValueType } from "../types";
+import { ADOCellValueType, NULL_OBJECTID } from "../types";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -83,12 +83,19 @@ describeIf("AnyDBClient Integration Tests", () => {
   });
 
   afterAll(async () => {
-    // Note: Add cleanup logic here if your API supports deleting records
-    // For now, we leave the test record in the system
-    if (testAdoId) {
-      console.log(
-        `ℹ Test record ${testAdoId} was created and may need manual cleanup`,
-      );
+    // Clean up the test record by deleting it
+    if (testAdoId && testTeamId && testAdbId) {
+      try {
+        await client.removeRecord({
+          adoid: testAdoId,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+        console.log(`✓ Cleaned up test record: ${testAdoId}`);
+      } catch (error) {
+        console.warn(`Warning: Could not delete test record: ${error}`);
+      }
     }
   });
 
@@ -272,6 +279,54 @@ describeIf("AnyDBClient Integration Tests", () => {
         if (updatedRecord.content) {
           expect(updatedRecord.content.B1?.value).toBe("updated value");
         }
+      });
+    });
+
+    describe("removeRecord", () => {
+      it("should remove a record completely when using NULL_OBJECTID", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        // Create a record to delete
+        const recordToDelete = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Record to Delete ${Date.now()}`,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "test",
+              type: ADOCellValueType.STRING,
+              value: "will be deleted",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+
+        const adoidToDelete = recordToDelete.meta.adoid;
+        expect(adoidToDelete).toBeTruthy();
+
+        // Delete the record using NULL_OBJECTID
+        const result = await client.removeRecord({
+          adoid: adoidToDelete,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+
+        expect(result).toBe(true);
+        console.log(`✓ Deleted record: ${adoidToDelete}`);
+
+        // Verify the record is deleted (should throw error)
+        await expect(
+          client.getRecord(testTeamId, testAdbId, adoidToDelete),
+        ).rejects.toThrow();
       });
     });
   });
