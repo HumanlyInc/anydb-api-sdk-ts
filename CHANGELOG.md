@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-01-21
 
 ### Added
+
 - Initial release of AnyDB SDK
 - Record operations: get, list, create, update, search
 - Team and database discovery

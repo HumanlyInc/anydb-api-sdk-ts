@@ -4,6 +4,7 @@
  */
 
 import axios, { AxiosInstance } from "axios";
+import { promises as fs } from "fs";
 import type {
   ADORecord,
   Team,
@@ -44,14 +45,14 @@ export class AnyDBClient {
       (config) => {
         const maskedKey = this.apiKey
           ? `${this.apiKey.substring(0, 8)}...${this.apiKey.substring(
-              this.apiKey.length - 4
+              this.apiKey.length - 4,
             )}`
           : "none";
         if (process.env.DEBUG_ANYDB) {
           console.log(
             `[AnyDB Request] ${config.method?.toUpperCase()} ${config.baseURL}${
               config.url
-            }`
+            }`,
           );
           console.log(`[AnyDB Request] API Key: ${maskedKey}`);
           console.log(`[AnyDB Request] User Email: ${this.userEmail}`);
@@ -60,7 +61,7 @@ export class AnyDBClient {
       },
       (error) => {
         return Promise.reject(error);
-      }
+      },
     );
 
     // Add response interceptor for logging (optional, can be disabled)
@@ -68,7 +69,7 @@ export class AnyDBClient {
       (response) => {
         if (process.env.DEBUG_ANYDB) {
           console.log(
-            `[AnyDB Response] Status: ${response.status} ${response.statusText}`
+            `[AnyDB Response] Status: ${response.status} ${response.statusText}`,
           );
         }
         return response;
@@ -80,14 +81,14 @@ export class AnyDBClient {
             error.response.data?.error ||
             error.response.statusText;
           throw new Error(
-            `AnyDB API Error (${error.response.status}): ${errorMsg}`
+            `AnyDB API Error (${error.response.status}): ${errorMsg}`,
           );
         } else if (error.request) {
           throw new Error("AnyDB API Error: No response received from server");
         } else {
           throw new Error(`AnyDB API Error: ${error.message}`);
         }
-      }
+      },
     );
   }
 
@@ -101,7 +102,7 @@ export class AnyDBClient {
   async getRecord(
     teamid: string,
     adbid: string,
-    adoid: string
+    adoid: string,
   ): Promise<ADORecord> {
     const response = await this.client.get("/integrations/ext/record", {
       params: { teamid, adbid, adoid },
@@ -133,7 +134,7 @@ export class AnyDBClient {
   async listRecords(
     teamid: string,
     adbid: string,
-    parentid?: string
+    parentid?: string,
   ): Promise<ADORecord[]> {
     const params: any = { teamid, adbid };
     if (parentid) {
@@ -151,7 +152,7 @@ export class AnyDBClient {
   async createRecord(params: CreateRecordParams): Promise<ADORecord> {
     const response = await this.client.post(
       "/integrations/ext/createrecord",
-      params
+      params,
     );
     return response.data;
   }
@@ -162,7 +163,7 @@ export class AnyDBClient {
   async updateRecord(params: UpdateRecordParams): Promise<ADORecord> {
     const response = await this.client.put(
       "/integrations/ext/updaterecord",
-      params
+      params,
     );
     return response.data;
   }
@@ -186,7 +187,9 @@ export class AnyDBClient {
    * If redirect is true, returns URL for direct download
    * If redirect is false, returns the file URL in response
    */
-  async downloadFile(params: DownloadFileParams): Promise<DownloadFileResponse> {
+  async downloadFile(
+    params: DownloadFileParams,
+  ): Promise<DownloadFileResponse> {
     const queryParams: any = {
       teamid: params.teamid,
       adbid: params.adbid,
@@ -223,7 +226,9 @@ export class AnyDBClient {
    * Step 1: Get upload URL from AnyDB service
    * Request a pre-signed URL to upload a file
    */
-  async getUploadUrl(params: GetUploadUrlParams): Promise<GetUploadUrlResponse> {
+  async getUploadUrl(
+    params: GetUploadUrlParams,
+  ): Promise<GetUploadUrlResponse> {
     const response = await this.client.get("/integrations/ext/getuploadurl", {
       params: {
         filename: params.filename,
@@ -244,7 +249,7 @@ export class AnyDBClient {
   async uploadFileToUrl(
     uploadUrl: string,
     fileContent: Buffer | string,
-    contentType?: string
+    contentType?: string,
   ): Promise<void> {
     await axios.put(uploadUrl, fileContent, {
       headers: {
@@ -259,7 +264,9 @@ export class AnyDBClient {
    * Step 3: Complete the upload process
    * Notify AnyDB service that the file has been uploaded
    */
-  async completeUpload(params: CompleteUploadParams): Promise<CompleteUploadResponse> {
+  async completeUpload(
+    params: CompleteUploadParams,
+  ): Promise<CompleteUploadResponse> {
     const response = await this.client.put("/integrations/ext/completeupload", {
       filesize: params.filesize,
       teamid: params.teamid,
@@ -276,26 +283,69 @@ export class AnyDBClient {
 
   /**
    * Complete file upload workflow (3 steps in one)
-   * @param file - The file content (Buffer or string)
-   * @param filename - Name of the file
-   * @param teamid - Team ID
-   * @param adbid - Database ID
-   * @param adoid - Record ID
-   * @param cellpos - Cell position (optional)
-   * @param contentType - MIME type (optional)
+   * Supports both file path and direct file content
+   * Automatically handles multipart upload for the file data
+   *
+   * @param params - Upload parameters
+   * @param params.filename - Name of the file
+   * @param params.filepath - Path to the file (mutually exclusive with fileContent)
+   * @param params.fileContent - File content as Buffer or string (mutually exclusive with filepath)
+   * @param params.teamid - Team ID
+   * @param params.adbid - Database ID
+   * @param params.adoid - Record ID
+   * @param params.cellpos - Cell position (default: "A1")
+   * @param params.contentType - MIME type (optional)
+   * @returns Promise resolving to CompleteUploadResponse
    */
-  async uploadFile(
-    file: Buffer | string,
-    filename: string,
-    teamid: string,
-    adbid: string,
-    adoid: string,
-    cellpos?: string,
-    contentType?: string
-  ): Promise<CompleteUploadResponse> {
-    const filesize = Buffer.isBuffer(file)
-      ? file.length.toString()
-      : Buffer.from(file).length.toString();
+  async uploadFile(params: {
+    filename: string;
+    filepath?: string;
+    fileContent?: Buffer | string;
+    teamid: string;
+    adbid: string;
+    adoid: string;
+    cellpos?: string;
+    contentType?: string;
+  }): Promise<CompleteUploadResponse> {
+    const {
+      filename,
+      filepath,
+      fileContent,
+      teamid,
+      adbid,
+      adoid,
+      cellpos = "A1",
+      contentType,
+    } = params;
+
+    // Validate input: must provide either filepath or fileContent
+    if (!filepath && !fileContent) {
+      throw new Error("Either filepath or fileContent must be provided");
+    }
+    if (filepath && fileContent) {
+      throw new Error(
+        "Cannot provide both filepath and fileContent. Choose one.",
+      );
+    }
+
+    // Read file content if filepath is provided
+    let file: Buffer;
+    if (filepath) {
+      try {
+        file = await fs.readFile(filepath);
+      } catch (error) {
+        throw new Error(
+          `Failed to read file from path "${filepath}": ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    } else {
+      // Convert fileContent to Buffer if it's a string
+      file = Buffer.isBuffer(fileContent)
+        ? fileContent
+        : Buffer.from(fileContent!);
+    }
+
+    const filesize = file.length.toString();
 
     // Step 1: Get upload URL
     const uploadUrlResponse = await this.getUploadUrl({
@@ -307,7 +357,7 @@ export class AnyDBClient {
       cellpos,
     });
 
-    // Step 2: Upload file
+    // Step 2: Upload file using multipart upload to the URL
     await this.uploadFileToUrl(uploadUrlResponse.url, file, contentType);
 
     // Step 3: Complete upload

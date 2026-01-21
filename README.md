@@ -1,6 +1,6 @@
 # AnyDB SDK
 
-TypeScript/JavaScript SDK for interacting with AnyDB API. Provides a simple and type-safe way to manage records, databases, teams, and files in AnyDB.
+TypeScript/JavaScript SDK for interacting with AnyDB API. Provides a simple and type-safe way to manage records, databases, teams, and files in AnyDB (www.anydb.com).
 
 ## Installation
 
@@ -11,22 +11,22 @@ npm install anydb-api-sdk-ts
 ## Quick Start
 
 ```typescript
-import { AnyDBClient } from 'anydb-api-sdk-ts';
+import { AnyDBClient } from "anydb-api-sdk-ts";
 
 // Initialize the client
 const client = new AnyDBClient({
-  apiKey: 'your-api-key',
-  userEmail: 'user@example.com',
-  baseURL: 'http://localhost:3000/api', // Optional, defaults to localhost
+  apiKey: "your-api-key",
+  userEmail: "user@example.com",
+  baseURL: "http://localhost:3000/api", // Optional, defaults to localhost
 });
 
 // List teams
 const teams = await client.listTeams();
-console.log('Teams:', teams);
+console.log("Teams:", teams);
 
 // Get a record
-const record = await client.getRecord('teamid', 'adbid', 'adoid');
-console.log('Record:', record);
+const record = await client.getRecord("teamid", "adbid", "adoid");
+console.log("Record:", record);
 ```
 
 ## Features
@@ -68,7 +68,7 @@ const teams = await client.listTeams();
 Get all databases within a team.
 
 ```typescript
-const databases = await client.listDatabasesForTeam('teamid');
+const databases = await client.listDatabasesForTeam("teamid");
 // Returns: ADB[]
 ```
 
@@ -77,9 +77,9 @@ const databases = await client.listDatabasesForTeam('teamid');
 List all records in a database.
 
 ```typescript
-const records = await client.listRecords('teamid', 'adbid');
+const records = await client.listRecords("teamid", "adbid");
 // With parent filter
-const childRecords = await client.listRecords('teamid', 'adbid', 'parentid');
+const childRecords = await client.listRecords("teamid", "adbid", "parentid");
 // Returns: ADORecord[]
 ```
 
@@ -88,7 +88,7 @@ const childRecords = await client.listRecords('teamid', 'adbid', 'parentid');
 Get a specific record with all its data.
 
 ```typescript
-const record = await client.getRecord('teamid', 'adbid', 'adoid');
+const record = await client.getRecord("teamid", "adbid", "adoid");
 // Returns: ADORecord
 ```
 
@@ -98,13 +98,13 @@ Create a new record in a database.
 
 ```typescript
 const newRecord = await client.createRecord({
-  teamid: 'teamid',
-  adbid: 'adbid',
-  name: 'New Record',
+  teamid: "teamid",
+  adbid: "adbid",
+  name: "New Record",
   content: {
-    'A1': { value: 'Hello' },
-    'B1': { value: 'World' }
-  }
+    A1: { value: "Hello" },
+    B1: { value: "World" },
+  },
 });
 // Returns: ADORecord
 ```
@@ -116,15 +116,15 @@ Update an existing record.
 ```typescript
 const updatedRecord = await client.updateRecord({
   meta: {
-    adoid: 'adoid',
-    adbid: 'adbid',
-    teamid: 'teamid',
-    name: 'Updated Name',
-    description: 'New description'
+    adoid: "adoid",
+    adbid: "adbid",
+    teamid: "teamid",
+    name: "Updated Name",
+    description: "New description",
   },
   content: {
-    'A1': { value: 'Updated value' }
-  }
+    A1: { value: "Updated value" },
+  },
 });
 // Returns: ADORecord
 ```
@@ -135,10 +135,10 @@ Search for records by keyword.
 
 ```typescript
 const results = await client.searchRecords({
-  teamid: 'teamid',
-  adbid: 'adbid',
-  search: 'keyword',
-  limit: '10'
+  teamid: "teamid",
+  adbid: "adbid",
+  search: "keyword",
+  limit: "10",
 });
 // Returns: ADORecord[]
 ```
@@ -152,14 +152,14 @@ Download a file or get its URL.
 ```typescript
 // Get download URL
 const { url } = await client.downloadFile({
-  teamid: 'teamid',
-  adbid: 'adbid',
-  adoid: 'adoid',
-  cellpos: 'C5',
-  redirect: false,  // Return URL instead of redirecting
-  preview: false    // Download instead of preview
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "adoid",
+  cellpos: "C5",
+  redirect: false, // Return URL instead of redirecting
+  preview: false, // Download instead of preview
 });
-console.log('Download URL:', url);
+console.log("Download URL:", url);
 ```
 
 #### Upload File (Simple)
@@ -168,13 +168,13 @@ Upload a file in one call (handles all 3 steps automatically).
 
 ```typescript
 const result = await client.uploadFile(
-  fileBuffer,           // Buffer or string
-  'document.pdf',       // filename
-  'teamid',
-  'adbid',
-  'adoid',
-  'C5',                 // cellpos (optional)
-  'application/pdf'     // contentType (optional)
+  fileBuffer, // Buffer or string
+  "document.pdf", // filename
+  "teamid",
+  "adbid",
+  "adoid",
+  "C5", // cellpos (optional)
+  "application/pdf", // contentType (optional)
 );
 ```
 
@@ -185,24 +185,24 @@ For more control, you can use the 3-step process manually:
 ```typescript
 // Step 1: Get upload URL
 const { url } = await client.getUploadUrl({
-  filename: 'document.pdf',
-  teamid: 'teamid',
-  adbid: 'adbid',
-  adoid: 'adoid',
+  filename: "document.pdf",
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "adoid",
   filesize: fileBuffer.length.toString(),
-  cellpos: 'C5'
+  cellpos: "C5",
 });
 
 // Step 2: Upload file to cloud storage
-await client.uploadFileToUrl(url, fileBuffer, 'application/pdf');
+await client.uploadFileToUrl(url, fileBuffer, "application/pdf");
 
 // Step 3: Complete the upload
 const result = await client.completeUpload({
   filesize: fileBuffer.length.toString(),
-  teamid: 'teamid',
-  adbid: 'adbid',
-  adoid: 'adoid',
-  cellpos: 'C5'
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "adoid",
+  cellpos: "C5",
 });
 ```
 
@@ -229,7 +229,7 @@ The SDK throws descriptive errors that include the HTTP status code and error me
 
 ```typescript
 try {
-  const record = await client.getRecord('teamid', 'adbid', 'invalid-adoid');
+  const record = await client.getRecord("teamid", "adbid", "invalid-adoid");
 } catch (error) {
   console.error(error.message);
   // Example: "AnyDB API Error (404): Record not found"
@@ -248,7 +248,7 @@ import type {
   CreateRecordParams,
   UpdateRecordParams,
   // ... and more
-} from 'anydb-api-sdk-ts';
+} from "anydb-api-sdk-ts";
 ```
 
 ## Examples
@@ -256,7 +256,7 @@ import type {
 ### Complete Workflow Example
 
 ```typescript
-import { AnyDBClient } from 'anydb-api-sdk-ts';
+import { AnyDBClient } from "anydb-api-sdk-ts";
 
 async function main() {
   const client = new AnyDBClient({
@@ -276,39 +276,39 @@ async function main() {
   const record = await client.createRecord({
     teamid,
     adbid,
-    name: 'My New Record',
+    name: "My New Record",
     content: {
-      'A1': { value: 'Hello' },
-      'B1': { value: 'World' }
-    }
+      A1: { value: "Hello" },
+      B1: { value: "World" },
+    },
   });
 
-  console.log('Created record:', record.adoid);
+  console.log("Created record:", record.adoid);
 
   // 4. Upload a file to the record
-  const fileBuffer = Buffer.from('Hello, this is a test file');
+  const fileBuffer = Buffer.from("Hello, this is a test file");
   await client.uploadFile(
     fileBuffer,
-    'test.txt',
+    "test.txt",
     teamid,
     adbid,
     record.adoid,
-    'C1',
-    'text/plain'
+    "C1",
+    "text/plain",
   );
 
-  console.log('File uploaded successfully');
+  console.log("File uploaded successfully");
 
   // 5. Download the file
   const { url } = await client.downloadFile({
     teamid,
     adbid,
     adoid: record.adoid,
-    cellpos: 'C1',
-    redirect: false
+    cellpos: "C1",
+    redirect: false,
   });
 
-  console.log('Download URL:', url);
+  console.log("Download URL:", url);
 }
 
 main().catch(console.error);
@@ -325,5 +325,7 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ## Support
 
 For issues and questions:
+
 - GitHub Issues: https://github.com/HumanlyInc/anydb-api-sdk-ts/issues
-- Email: support@humanly.com
+- Email: support@anydb.com
+- Support: www.anydb.com/support
