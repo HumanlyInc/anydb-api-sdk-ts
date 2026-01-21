@@ -5,13 +5,13 @@ TypeScript/JavaScript SDK for interacting with AnyDB API. Provides a simple and 
 ## Installation
 
 ```bash
-npm install anydb-ts-sdk
+npm install anydb-api-sdk-ts
 ```
 
 ## Quick Start
 
 ```typescript
-import { AnyDBClient } from 'anydb-ts-sdk';
+import { AnyDBClient } from 'anydb-api-sdk-ts';
 
 // Initialize the client
 const client = new AnyDBClient({
@@ -248,7 +248,7 @@ import type {
   CreateRecordParams,
   UpdateRecordParams,
   // ... and more
-} from 'anydb-ts-sdk';
+} from 'anydb-api-sdk-ts';
 ```
 
 ## Examples
@@ -256,7 +256,7 @@ import type {
 ### Complete Workflow Example
 
 ```typescript
-import { AnyDBClient } from 'anydb-ts-sdk';
+import { AnyDBClient } from 'anydb-api-sdk-ts';
 
 async function main() {
   const client = new AnyDBClient({
@@ -325,5 +325,5 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/HumanlyInc/anydb-ts-sdk/issues
+- GitHub Issues: https://github.com/HumanlyInc/anydb-api-sdk-ts/issues
 - Email: support@humanly.com
