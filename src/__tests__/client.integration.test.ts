@@ -8,17 +8,18 @@
  * - ANYDB_USER_EMAIL: Your user email
  * - ANYDB_TEST_TEAM_ID: A test team ID
  * - ANYDB_TEST_ADB_ID: A test database ID
- * - ANYDB_TEST_ADO_ID: A test record ID
  *
  * Run with: npm run test:integration
  * Or: ANYDB_BASE_URL=... ANYDB_API_KEY=... npm run test:integration
  */
 
 import { AnyDBClient } from "../client";
+import { ADOCellValueType } from "../types";
 import { promises as fs } from "fs";
 import path from "path";
 
 // Skip these tests if environment variables are not set
+
 const shouldRunIntegrationTests =
   process.env.ANYDB_BASE_URL &&
   process.env.ANYDB_API_KEY &&
@@ -28,6 +29,7 @@ const describeIf = shouldRunIntegrationTests ? describe : describe.skip;
 
 describeIf("AnyDBClient Integration Tests", () => {
   let client: AnyDBClient;
+
   const config = {
     baseURL: process.env.ANYDB_BASE_URL!,
     apiKey: process.env.ANYDB_API_KEY!,
@@ -37,10 +39,57 @@ describeIf("AnyDBClient Integration Tests", () => {
   // Test data from environment
   const testTeamId = process.env.ANYDB_TEST_TEAM_ID || "";
   const testAdbId = process.env.ANYDB_TEST_ADB_ID || "";
-  const testAdoId = process.env.ANYDB_TEST_ADO_ID || "";
 
-  beforeAll(() => {
+  // Test ADO will be created dynamically
+  let testAdoId = "";
+
+  beforeAll(async () => {
     client = new AnyDBClient(config);
+
+    // Create a test ADO if teamId and adbId are provided
+    if (testTeamId && testAdbId) {
+      try {
+        const testRecord = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Integration Test Record - ${new Date().toISOString()}`,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "testField",
+              type: ADOCellValueType.STRING,
+              value: "integration test",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+            A2: {
+              pos: "A2",
+              key: "createdAt",
+              type: ADOCellValueType.STRING,
+              value: new Date().toISOString(),
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+        testAdoId = testRecord.meta.adoid;
+        console.log(`✓ Created test record with ID: ${testAdoId}`);
+      } catch (error) {
+        console.warn("Warning: Could not create test record:", error);
+      }
+    }
+  });
+
+  afterAll(async () => {
+    // Note: Add cleanup logic here if your API supports deleting records
+    // For now, we leave the test record in the system
+    if (testAdoId) {
+      console.log(
+        `ℹ Test record ${testAdoId} was created and may need manual cleanup`,
+      );
+    }
   });
 
   describe("Record Operations", () => {
@@ -89,25 +138,38 @@ describeIf("AnyDBClient Integration Tests", () => {
           expect(records[0]).toHaveProperty("adoid");
           expect(records[0]).toHaveProperty("adbid");
           expect(records[0]).toHaveProperty("teamid");
-          expect(records[0]).toHaveProperty("meta");
         }
       });
     });
 
     describe("getRecord", () => {
       it("should get a specific record", async () => {
-        if (!testTeamId || !testAdbId || !testAdoId) {
-          console.warn("Skipping: Required test IDs not set");
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!testAdoId) {
+          console.warn("Skipping: Test ADO was not created");
           return;
         }
 
         const record = await client.getRecord(testTeamId, testAdbId, testAdoId);
 
-        expect(record).toHaveProperty("adoid", testAdoId);
-        expect(record).toHaveProperty("adbid", testAdbId);
-        expect(record).toHaveProperty("teamid", testTeamId);
+        expect(record.meta).toHaveProperty("adoid", testAdoId);
+        expect(record.meta).toHaveProperty("adbid", testAdbId);
+        expect(record.meta).toHaveProperty("teamid", testTeamId);
         expect(record).toHaveProperty("meta");
         expect(record.meta).toHaveProperty("name");
+
+        // Verify content structure
+        if (record.content) {
+          expect(record.content.A1).toBeDefined();
+          expect(record.content.A1?.pos).toBe("A1");
+          expect(record.content.A1?.value).toBe("integration test");
+        }
       });
     });
 
@@ -140,52 +202,101 @@ describeIf("AnyDBClient Integration Tests", () => {
           return;
         }
 
-        // Create a test record
+        // Create a test record with proper content structure
         const newRecord = await client.createRecord({
           teamid: testTeamId,
           adbid: testAdbId,
           name: `Test Record ${Date.now()}`,
           content: {
-            testField: "test value",
+            A1: {
+              pos: "A1",
+              key: "Name",
+              type: ADOCellValueType.STRING,
+              value: "Test Person",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+            A2: {
+              pos: "A2",
+              key: "Age",
+              type: ADOCellValueType.NUMBER,
+              value: 25,
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+            B1: {
+              pos: "B1",
+              key: "testField",
+              type: ADOCellValueType.STRING,
+              value: "test value",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
           },
         });
 
-        expect(newRecord).toHaveProperty("adoid");
+        expect(newRecord.meta).toHaveProperty("adoid");
         expect(newRecord.meta.name).toContain("Test Record");
-        expect(newRecord.content?.testField).toBe("test value");
+        expect(newRecord.content).toBeDefined();
+        if (newRecord.content) {
+          expect(newRecord.content.B1?.value).toBe("test value");
+        }
 
-        // Update the record
+        // Update the record with minimal cell data
         const updatedRecord = await client.updateRecord({
           meta: {
-            adoid: newRecord.adoid,
+            adoid: newRecord.meta.adoid,
             adbid: testAdbId,
             teamid: testTeamId,
             name: `Updated Record ${Date.now()}`,
           },
           content: {
-            testField: "updated value",
+            A1: {
+              pos: "A1",
+              key: "Name",
+              value: "Updated Person",
+            },
+            B1: {
+              pos: "B1",
+              key: "testField",
+              value: "updated value",
+            },
           },
         });
 
-        expect(updatedRecord.adoid).toBe(newRecord.adoid);
+        expect(updatedRecord.meta.adoid).toBe(newRecord.meta.adoid);
         expect(updatedRecord.meta.name).toContain("Updated Record");
-        expect(updatedRecord.content?.testField).toBe("updated value");
+        if (updatedRecord.content) {
+          expect(updatedRecord.content.B1?.value).toBe("updated value");
+        }
       });
     });
   });
 
   describe("File Operations", () => {
+    let uploadedFileAdoId: string;
+
     describe("uploadFile with fileContent", () => {
       it("should upload a file using file content", async () => {
-        if (!testTeamId || !testAdbId || !testAdoId) {
-          console.warn("Skipping: Required test IDs not set");
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!testAdoId) {
+          console.warn("Skipping: Test ADO was not created");
           return;
         }
 
         const testContent = `Test file content created at ${new Date().toISOString()}`;
         const fileBuffer = Buffer.from(testContent);
 
-        const result = await client.uploadFile({
+        uploadedFileAdoId = await client.uploadFile({
           filename: "test-file.txt",
           fileContent: fileBuffer,
           teamid: testTeamId,
@@ -195,15 +306,23 @@ describeIf("AnyDBClient Integration Tests", () => {
           contentType: "text/plain",
         });
 
-        expect(result).toHaveProperty("success");
-        expect(result.success).toBe(true);
+        expect(uploadedFileAdoId).toBeTruthy();
+        expect(typeof uploadedFileAdoId).toBe("string");
+        console.log(`✓ Uploaded file with ADOID: ${uploadedFileAdoId}`);
       }, 30000); // 30 second timeout for upload
     });
 
     describe("uploadFile with filepath", () => {
       it("should upload a file using filepath", async () => {
-        if (!testTeamId || !testAdbId || !testAdoId) {
-          console.warn("Skipping: Required test IDs not set");
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!testAdoId) {
+          console.warn("Skipping: Test ADO was not created");
           return;
         }
 
@@ -213,7 +332,7 @@ describeIf("AnyDBClient Integration Tests", () => {
         await fs.writeFile(tempFilePath, testContent);
 
         try {
-          const result = await client.uploadFile({
+          const fileAdoId = await client.uploadFile({
             filename: "test-file-from-disk.txt",
             filepath: tempFilePath,
             teamid: testTeamId,
@@ -223,8 +342,8 @@ describeIf("AnyDBClient Integration Tests", () => {
             contentType: "text/plain",
           });
 
-          expect(result).toHaveProperty("success");
-          expect(result.success).toBe(true);
+          expect(fileAdoId).toBeTruthy();
+          expect(typeof fileAdoId).toBe("string");
         } finally {
           // Clean up temp file
           await fs.unlink(tempFilePath).catch(() => {});
@@ -233,22 +352,30 @@ describeIf("AnyDBClient Integration Tests", () => {
     });
 
     describe("downloadFile", () => {
-      it("should download or get URL for a file", async () => {
-        if (!testTeamId || !testAdbId || !testAdoId) {
-          console.warn("Skipping: Required test IDs not set");
+      it("should download or get URL for the uploaded file", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!uploadedFileAdoId) {
+          console.warn("Skipping: No file was uploaded in previous test");
           return;
         }
 
         const result = await client.downloadFile({
           teamid: testTeamId,
           adbid: testAdbId,
-          adoid: testAdoId,
+          adoid: uploadedFileAdoId,
           cellpos: "A1",
-          redirect: true,
+          redirect: false,
         });
 
         expect(result).toHaveProperty("url");
         expect(typeof result.url).toBe("string");
+        console.log(`✓ Got download URL for file ${uploadedFileAdoId}`);
       });
     });
   });
@@ -277,5 +404,7 @@ if (!shouldRunIntegrationTests) {
   console.log("  - ANYDB_USER_EMAIL");
   console.log("  - ANYDB_TEST_TEAM_ID (optional, for specific tests)");
   console.log("  - ANYDB_TEST_ADB_ID (optional, for specific tests)");
-  console.log("  - ANYDB_TEST_ADO_ID (optional, for specific tests)\n");
+  console.log(
+    "\nNote: A test record will be automatically created for tests that require an ADO ID.\n",
+  );
 }

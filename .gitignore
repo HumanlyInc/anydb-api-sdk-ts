@@ -34,3 +34,6 @@ coverage/
 # Misc
 *.bak
 *.tmp
+
+# Integration test script with credentials
+run-integration-tests.sh

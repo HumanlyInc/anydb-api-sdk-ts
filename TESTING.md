@@ -38,9 +38,9 @@ ANYDB_API_KEY=your-api-key-here
 ANYDB_USER_EMAIL=your-email@example.com
 
 # Optional - for specific record/database tests
+# A test record will be automatically created if these are provided
 ANYDB_TEST_TEAM_ID=your-team-id
 ANYDB_TEST_ADB_ID=your-database-id
-ANYDB_TEST_ADO_ID=your-record-id
 ```
 
 ### 2. Run integration tests
@@ -64,6 +64,8 @@ npm run test:all
 ### Notes
 
 - Integration tests will be **skipped** if environment variables are not set
-- Integration tests may create temporary records/files in your AnyDB instance
+- A test record (ADO) is automatically created when TEAM_ID and ADB_ID are provided
+- Integration tests may create records/files in your AnyDB instance
 - File upload tests create temporary test files that are automatically cleaned up
 - Integration tests have longer timeouts (30s) to accommodate network requests
+- Test records created during integration tests may need manual cleanup

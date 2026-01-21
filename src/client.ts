@@ -15,11 +15,10 @@ import type {
   DownloadFileParams,
   DownloadFileResponse,
   GetUploadUrlParams,
-  GetUploadUrlResponse,
   CompleteUploadParams,
-  CompleteUploadResponse,
   AnyDBClientConfig,
 } from "./types.js";
+import { PredefinedTemplateAdoIds } from "./types.js";
 
 export class AnyDBClient {
   private client: AxiosInstance;
@@ -69,7 +68,7 @@ export class AnyDBClient {
       (response) => {
         if (process.env.DEBUG_ANYDB) {
           console.log(
-            `[AnyDB Response] Status: ${response.status} ${response.statusText}`,
+            `[AnyDB Response] Status: ${response.status} ${response.message}`,
           );
         }
         return response;
@@ -107,7 +106,10 @@ export class AnyDBClient {
     const response = await this.client.get("/integrations/ext/record", {
       params: { teamid, adbid, adoid },
     });
-    return response.data;
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to get record ${adoid}: ${response.message}`);
   }
 
   /**
@@ -115,7 +117,11 @@ export class AnyDBClient {
    */
   async listTeams(): Promise<Team[]> {
     const response = await this.client.get("/integrations/ext/listteams");
-    return response.data;
+
+    if (response.status === 200 && response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to list teams: ${response.message}`);
   }
 
   /**
@@ -125,7 +131,13 @@ export class AnyDBClient {
     const response = await this.client.get("/integrations/ext/listdbsforteam", {
       params: { teamid },
     });
-    return response.data;
+    // check if response is 200 and status is "success" and if so, return data
+    if (response.status === 200 && response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to list databases for team ${teamid}: ${response.message}`,
+    );
   }
 
   /**
@@ -135,7 +147,7 @@ export class AnyDBClient {
     teamid: string,
     adbid: string,
     parentid?: string,
-  ): Promise<ADORecord[]> {
+  ): Promise<ADORecord["meta"][]> {
     const params: any = { teamid, adbid };
     if (parentid) {
       params.parentid = parentid;
@@ -143,7 +155,14 @@ export class AnyDBClient {
     const response = await this.client.get("/integrations/ext/list", {
       params,
     });
-    return response.data;
+
+    //console.log(response.data);
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to list records for database ${adbid}: ${response.message}`,
+    );
   }
 
   /**
@@ -154,7 +173,11 @@ export class AnyDBClient {
       "/integrations/ext/createrecord",
       params,
     );
-    return response.data;
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to create record: ${response.message}`);
   }
 
   /**
@@ -165,7 +188,10 @@ export class AnyDBClient {
       "/integrations/ext/updaterecord",
       params,
     );
-    return response.data;
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to update record: ${response.message}`);
   }
 
   /**
@@ -175,7 +201,10 @@ export class AnyDBClient {
     const response = await this.client.get("/integrations/ext/search", {
       params,
     });
-    return response.data;
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to search records: ${response.message}`);
   }
 
   // ============================================================================
@@ -209,6 +238,7 @@ export class AnyDBClient {
       maxRedirects: 0, // Don't follow redirects automatically
       validateStatus: (status) => status >= 200 && status < 400, // Accept 302
     });
+    console.log(response.data);
 
     // If it's a redirect response, return the Location header
     if (response.status === 302 && response.headers.location) {
@@ -226,9 +256,7 @@ export class AnyDBClient {
    * Step 1: Get upload URL from AnyDB service
    * Request a pre-signed URL to upload a file
    */
-  async getUploadUrl(
-    params: GetUploadUrlParams,
-  ): Promise<GetUploadUrlResponse> {
+  async getUploadUrl(params: GetUploadUrlParams): Promise<string> {
     const response = await this.client.get("/integrations/ext/getuploadurl", {
       params: {
         filename: params.filename,
@@ -239,7 +267,10 @@ export class AnyDBClient {
         cellpos: params.cellpos,
       },
     });
-    return response.data;
+    if (response.data.status !== "success") {
+      throw new Error(`Failed to get upload URL: ${response.message}`);
+    }
+    return response.data.data.url;
   }
 
   /**
@@ -264,9 +295,7 @@ export class AnyDBClient {
    * Step 3: Complete the upload process
    * Notify AnyDB service that the file has been uploaded
    */
-  async completeUpload(
-    params: CompleteUploadParams,
-  ): Promise<CompleteUploadResponse> {
+  async completeUpload(params: CompleteUploadParams): Promise<boolean> {
     const response = await this.client.put("/integrations/ext/completeupload", {
       filesize: params.filesize,
       teamid: params.teamid,
@@ -274,7 +303,10 @@ export class AnyDBClient {
       adoid: params.adoid,
       cellpos: params.cellpos,
     });
-    return response.data;
+    if (response.data.status !== "success") {
+      throw new Error(`Failed to complete upload: ${response.message}`);
+    }
+    return true;
   }
 
   // ============================================================================
@@ -282,7 +314,7 @@ export class AnyDBClient {
   // ============================================================================
 
   /**
-   * Complete file upload workflow (3 steps in one)
+   * Complete file upload workflow (4 steps in one)
    * Supports both file path and direct file content
    * Automatically handles multipart upload for the file data
    *
@@ -292,10 +324,10 @@ export class AnyDBClient {
    * @param params.fileContent - File content as Buffer or string (mutually exclusive with filepath)
    * @param params.teamid - Team ID
    * @param params.adbid - Database ID
-   * @param params.adoid - Record ID
+   * @param params.adoid - Parent record ID (file will be attached as child)
    * @param params.cellpos - Cell position (default: "A1")
    * @param params.contentType - MIME type (optional)
-   * @returns Promise resolving to CompleteUploadResponse
+   * @returns Promise resolving to adoid of the created file record
    */
   async uploadFile(params: {
     filename: string;
@@ -306,7 +338,7 @@ export class AnyDBClient {
     adoid: string;
     cellpos?: string;
     contentType?: string;
-  }): Promise<CompleteUploadResponse> {
+  }): Promise<string> {
     const {
       filename,
       filepath,
@@ -347,26 +379,42 @@ export class AnyDBClient {
 
     const filesize = file.length.toString();
 
-    // Step 1: Get upload URL
-    const uploadUrlResponse = await this.getUploadUrl({
+    // Step 1: Create a new record as a child of the provided adoid using FILE_TEMPLATE
+    const fileRecord = await this.createRecord({
+      teamid,
+      adbid,
+      name: filename,
+      attach: adoid,
+      template: PredefinedTemplateAdoIds.FILE_TEMPLATE_ADOID,
+    });
+    //console.log(fileRecord);
+
+    // Use the newly created file record's adoid for subsequent operations
+    const fileAdoid = fileRecord.meta.adoid;
+
+    // Step 2: Get upload URL for the new file record
+    const url = await this.getUploadUrl({
       filename,
       teamid,
       adbid,
-      adoid,
+      adoid: fileAdoid,
       filesize,
       cellpos,
     });
+    //console.log(url);
 
-    // Step 2: Upload file using multipart upload to the URL
-    await this.uploadFileToUrl(uploadUrlResponse.url, file, contentType);
+    // Step 3: Upload file using multipart upload to the URL
+    await this.uploadFileToUrl(url, file, contentType);
 
-    // Step 3: Complete upload
-    return await this.completeUpload({
+    // Step 4: Complete upload for the new file record
+    await this.completeUpload({
       filesize,
       teamid,
       adbid,
-      adoid,
+      adoid: fileAdoid,
       cellpos,
     });
+
+    return fileRecord.meta.adoid;
   }
 }

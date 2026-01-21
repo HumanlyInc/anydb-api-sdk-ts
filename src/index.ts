@@ -6,6 +6,9 @@
 export { AnyDBClient } from "./client.js";
 export type {
   ADORecord,
+  ADOCell,
+  ADOCellUpdate,
+  ADOContent,
   Team,
   ADB,
   CreateRecordParams,
@@ -18,4 +21,9 @@ export type {
   CompleteUploadParams,
   CompleteUploadResponse,
   AnyDBClientConfig,
+} from "./types.js";
+export {
+  PredefinedTemplateAdoIds,
+  ADOCellValueType,
+  ADOCellFormat,
 } from "./types.js";
