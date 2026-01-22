@@ -1,6 +1,8 @@
 # AnyDB SDK
 
-TypeScript/JavaScript SDK for interacting with AnyDB API. Provides a simple and type-safe way to manage records, databases, teams, and files in AnyDB (www.anydb.com).
+Official TypeScript/JavaScript SDK for [AnyDB](https://www.anydb.com) - The flexible, API-first database platform. Provides a simple and type-safe way to manage records, databases, teams, and files.
+
+[AnyDB](https://www.anydb.com) is a powerful, spreadsheet-like database that combines the flexibility of spreadsheets with the power of a database. Build custom applications, automate workflows, and integrate with your existing tools.
 
 ## Installation
 
@@ -74,13 +76,28 @@ const databases = await client.listDatabasesForTeam("teamid");
 
 #### List Records
 
-List all records in a database.
+List all records in a database with pagination support.
 
 ```typescript
-const records = await client.listRecords("teamid", "adbid");
-// With parent filter
+const response = await client.listRecords("teamid", "adbid");
+console.log(response.items); // Array of records
+console.log(response.total); // Total count
+console.log(response.hasmore); // Has more pages
+
+// With parent filter (for folder hierarchy)
 const childRecords = await client.listRecords("teamid", "adbid", "parentid");
-// Returns: ADORecord[]
+
+// With pagination
+const page2 = await client.listRecords(
+  "teamid",
+  "adbid",
+  undefined,
+  undefined,
+  undefined,
+  "50", // pagesize
+  response.lastmarker // lastmarker from previous response
+);
+// Returns: ListRecordsResponse { items, lastmarker, hasmore, total }
 ```
 
 #### Get Record
@@ -97,13 +114,29 @@ const record = await client.getRecord("teamid", "adbid", "adoid");
 Create a new record in a database.
 
 ```typescript
+import { ADOCellValueType } from "anydb-api-sdk-ts";
+
 const newRecord = await client.createRecord({
   teamid: "teamid",
   adbid: "adbid",
   name: "New Record",
   content: {
-    A1: { value: "Hello" },
-    B1: { value: "World" },
+    A1: {
+      pos: "A1",
+      key: "firstName",
+      type: ADOCellValueType.STRING,
+      value: "John",
+      colspan: 1,
+      rowspan: 1,
+    },
+    B1: {
+      pos: "B1",
+      key: "age",
+      type: ADOCellValueType.NUMBER,
+      value: 30,
+      colspan: 1,
+      rowspan: 1,
+    },
   },
 });
 // Returns: ADORecord
@@ -162,47 +195,57 @@ const { url } = await client.downloadFile({
 console.log("Download URL:", url);
 ```
 
-#### Upload File (Simple)
+#### Upload File
 
-Upload a file in one call (handles all 3 steps automatically).
-
-```typescript
-const result = await client.uploadFile(
-  fileBuffer, // Buffer or string
-  "document.pdf", // filename
-  "teamid",
-  "adbid",
-  "adoid",
-  "C5", // cellpos (optional)
-  "application/pdf", // contentType (optional)
-);
-```
-
-#### Upload File (Manual 3-Step Process)
-
-For more control, you can use the 3-step process manually:
+Upload a file in one call (handles all steps automatically including creating a child file record).
 
 ```typescript
-// Step 1: Get upload URL
-const { url } = await client.getUploadUrl({
+// Upload from file content
+const fileAdoid = await client.uploadFile({
   filename: "document.pdf",
+  fileContent: fileBuffer, // Buffer or string
   teamid: "teamid",
   adbid: "adbid",
-  adoid: "adoid",
-  filesize: fileBuffer.length.toString(),
-  cellpos: "C5",
+  adoid: "parentAdoid", // Parent record to attach file to
+  cellpos: "A1", // Optional, defaults to "A1"
+  contentType: "application/pdf", // Optional
 });
 
-// Step 2: Upload file to cloud storage
-await client.uploadFileToUrl(url, fileBuffer, "application/pdf");
-
-// Step 3: Complete the upload
-const result = await client.completeUpload({
-  filesize: fileBuffer.length.toString(),
+// Upload from file path
+const fileAdoid = await client.uploadFile({
+  filename: "document.pdf",
+  filepath: "/path/to/document.pdf",
   teamid: "teamid",
   adbid: "adbid",
+  adoid: "parentAdoid",
+  cellpos: "A1",
+});
+
+// Returns: string (ADOID of the created file record)
+console.log("File uploaded with ID:", fileAdoid);
+```
+
+#### Remove Record
+
+Remove or delete a record.
+
+```typescript
+import { NULL_OBJECTID } from "anydb-api-sdk-ts";
+
+// Remove from specific parent (detach)
+await client.removeRecord({
   adoid: "adoid",
-  cellpos: "C5",
+  adbid: "adbid",
+  teamid: "teamid",
+  removefromids: "parentAdoid1,parentAdoid2", // Comma-separated parent IDs
+});
+
+// Delete completely
+await client.removeRecord({
+  adoid: "adoid",
+  adbid: "adbid",
+  teamid: "teamid",
+  removefromids: NULL_OBJECTID, // Special constant for deletion
 });
 ```
 
@@ -211,7 +254,40 @@ const result = await client.completeUpload({
 - **teamid**: MongoDB ObjectId identifying a team/organization. Each team is a separate workspace.
 - **adbid**: MongoDB ObjectId for an ADB (AnyDB Database). Similar to a spreadsheet or table.
 - **adoid**: MongoDB ObjectId for an ADO (AnyDB Object/Record). Similar to a row in a spreadsheet.
-- **cellpos**: Cell position identifier (e.g., "A1", "B2"). Each record has cells organized in a grid.
+- **cellpos**: Cell position identifier (e.g., "A1", "B2"). Valid positions are A1-A9, B1-B9, etc. (Note: A0, B0, etc. are not valid)
+
+### Predefined Templates
+
+AnyDB provides predefined templates for common record types:
+
+```typescript
+import { PredefinedTemplateAdoIds } from "anydb-api-sdk-ts";
+
+// Create a folder
+const folder = await client.createRecord({
+  teamid,
+  adbid,
+  name: "My Folder",
+  template: PredefinedTemplateAdoIds.FOLDER_TEMPLATE_ADOID,
+});
+
+// Create a page
+const page = await client.createRecord({
+  teamid,
+  adbid,
+  name: "My Page",
+  template: PredefinedTemplateAdoIds.PAGE_TEMPLATE_ADOID,
+});
+
+// Available templates:
+// - FILE_TEMPLATE_ADOID
+// - FOLDER_TEMPLATE_ADOID
+// - PAGE_TEMPLATE_ADOID
+// - LINK_TEMPLATE_ADOID
+// - VIEW_TEMPLATE_ADOID
+```
+
+Learn more about AnyDB concepts in the [official documentation](https://www.anydb.com/support).
 
 ## Debug Mode
 
@@ -278,33 +354,39 @@ async function main() {
     adbid,
     name: "My New Record",
     content: {
-      A1: { value: "Hello" },
-      B1: { value: "World" },
+      A1: {
+        pos: "A1",
+        key: "description",
+        type: "string",
+        value: "Hello World",
+        colspan: 1,
+        rowspan: 1,
+      },
     },
   });
 
-  console.log("Created record:", record.adoid);
+  console.log("Created record:", record.meta.adoid);
 
   // 4. Upload a file to the record
   const fileBuffer = Buffer.from("Hello, this is a test file");
-  await client.uploadFile(
-    fileBuffer,
-    "test.txt",
+  const fileAdoid = await client.uploadFile({
+    filename: "test.txt",
+    fileContent: fileBuffer,
     teamid,
     adbid,
-    record.adoid,
-    "C1",
-    "text/plain",
-  );
+    adoid: record.meta.adoid,
+    cellpos: "A1",
+    contentType: "text/plain",
+  });
 
-  console.log("File uploaded successfully");
+  console.log("File uploaded with ID:", fileAdoid);
 
   // 5. Download the file
   const { url } = await client.downloadFile({
     teamid,
     adbid,
-    adoid: record.adoid,
-    cellpos: "C1",
+    adoid: fileAdoid,
+    cellpos: "A1",
     redirect: false,
   });
 
@@ -322,10 +404,15 @@ MIT
 
 Contributions are welcome! Please open an issue or submit a pull request.
 
-## Support
+## Resources
 
-For issues and questions:
+- **Website**: [www.anydb.com](https://www.anydb.com)
+- **Documentation**: [www.anydb.com/support](https://www.anydb.com/support)
+- **GitHub Issues**: [github.com/HumanlyInc/anydb-api-sdk-ts/issues](https://github.com/HumanlyInc/anydb-api-sdk-ts/issues)
+- **Email Support**: support@anydb.com
 
-- GitHub Issues: https://github.com/HumanlyInc/anydb-api-sdk-ts/issues
-- Email: support@anydb.com
-- Support: www.anydb.com/support
+## About AnyDB
+
+[AnyDB](https://www.anydb.com) is a flexible, API-first database platform that combines the ease of spreadsheets with the power of a database. Build custom applications, automate workflows, manage data, and integrate seamlessly with your existing tools.
+
+Visit [www.anydb.com](https://www.anydb.com) to learn more or get started for free.
