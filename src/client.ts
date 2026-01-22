@@ -229,7 +229,6 @@ export class AnyDBClient {
     const response = await this.client.delete("/integrations/ext/remove", {
       data: params,
     });
-    console.log("Response = ", response.data);
     if (response.data.status === "success") {
       return true;
     }
