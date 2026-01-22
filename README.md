@@ -440,9 +440,3 @@ Contributions are welcome! Please open an issue or submit a pull request.
 - **Documentation**: [www.anydb.com/support](https://www.anydb.com/support)
 - **GitHub Issues**: [github.com/HumanlyInc/anydb-api-sdk-ts/issues](https://github.com/HumanlyInc/anydb-api-sdk-ts/issues)
 - **Email Support**: support@anydb.com
-
-## About AnyDB
-
-[AnyDB](https://www.anydb.com) is a flexible, API-first database platform that combines the ease of spreadsheets with the power of a database. Build custom applications, automate workflows, manage data, and integrate seamlessly with your existing tools.
-
-Visit [www.anydb.com](https://www.anydb.com) to learn more or get started for free.
