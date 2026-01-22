@@ -1,14 +1,44 @@
 # AnyDB SDK
 
-Official TypeScript/JavaScript SDK for [AnyDB](https://www.anydb.com) - The flexible, API-first database platform. Provides a simple and type-safe way to manage records, databases, teams, and files.
+Official TypeScript/JavaScript SDK for [AnyDB](https://www.anydb.com) - The object-based platform for managing custom business operations. Provides a simple and type-safe way to manage records, databases, teams, and files.
 
-[AnyDB](https://www.anydb.com) is a powerful, spreadsheet-like database that combines the flexibility of spreadsheets with the power of a database. Build custom applications, automate workflows, and integrate with your existing tools.
+## About AnyDB
+
+[AnyDB](https://www.anydb.com) is an object-based platform for managing custom business operations.
+
+Most software forces work into rigid tables, fixed modules, or predefined workflows. Real operations do not work that way. They are made up of things that belong together and things that relate to each other.
+
+AnyDB lets you model your business the way it actually runs.
+
+### The Problem AnyDB Solves
+
+Operational data is usually fragmented:
+
+- Information spread across spreadsheets, tools, folders, and emails
+- Records split across multiple tables that only make sense when joined
+- Files and notes disconnected from the data they belong to
+- Systems that break when workflows evolve
+
+AnyDB replaces this with complete, connected business records.
+
+Visit [www.anydb.com](https://www.anydb.com) to learn more.
 
 ## Installation
 
 ```bash
 npm install anydb-api-sdk-ts
 ```
+
+## Getting Your API Key
+
+Before using the SDK, you'll need to obtain your API key from [AnyDB](https://www.anydb.com):
+
+1. Log in to your AnyDB account at [app.anydb.com](https://app.anydb.com)
+2. Click on the **user icon** in the bottom right corner of the browser UI
+3. In the Profile Dialog that opens, navigate to the **Integration** tab
+4. Copy your API key from the Integration settings
+
+Your API key is unique to your account and should be kept secure. Never commit it to version control or share it publicly.
 
 ## Quick Start
 
@@ -95,7 +125,7 @@ const page2 = await client.listRecords(
   undefined,
   undefined,
   "50", // pagesize
-  response.lastmarker // lastmarker from previous response
+  response.lastmarker, // lastmarker from previous response
 );
 // Returns: ListRecordsResponse { items, lastmarker, hasmore, total }
 ```
