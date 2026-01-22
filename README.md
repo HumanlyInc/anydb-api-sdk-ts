@@ -17,7 +17,7 @@ import { AnyDBClient } from "anydb-api-sdk-ts";
 const client = new AnyDBClient({
   apiKey: "your-api-key",
   userEmail: "user@example.com",
-  baseURL: "http://localhost:3000/api", // Optional, defaults to localhost
+  baseURL: "https://app.anydb.com/api", // Optional, defaults to localhost
 });
 
 // List teams
