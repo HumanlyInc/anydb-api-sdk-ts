@@ -12,6 +12,8 @@ import type {
   CreateRecordParams,
   UpdateRecordParams,
   RemoveRecordParams,
+  CopyRecordParams,
+  MoveRecordParams,
   ListRecordsResponse,
   SearchRecordsParams,
   DownloadFileParams,
@@ -233,6 +235,58 @@ export class AnyDBClient {
       return true;
     }
     throw new Error(`Failed to remove record: ${response.message}`);
+  }
+
+  /**
+   * Copy a record
+   * @param params.adoid - Record ID to copy
+   * @param params.adbid - Database ID
+   * @param params.teamid - Team ID
+   * @param params.attachto - Optional ID of another record to attach the copy to
+   * @param params.attachmentsmode - How to handle attachments: "noattachments", "link", or "duplicate"
+   */
+  async copyRecord(params: CopyRecordParams): Promise<ADORecord> {
+    const bodyParams: any = {
+      adoid: params.adoid,
+      adbid: params.adbid,
+      teamid: params.teamid,
+    };
+
+    if (params.attachto) {
+      bodyParams.attachto = params.attachto;
+    }
+    if (params.attachmentsmode) {
+      bodyParams.attachmentsmode = params.attachmentsmode;
+    }
+
+    const response = await this.client.post(
+      "/integrations/ext/copyrecord",
+      bodyParams,
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to copy record: ${response.message}`);
+  }
+
+  /**
+   * Move a record to a new parent
+   * Convenience method that uses updateRecord to change the parent
+   * @param params.adoid - Source record ID to move
+   * @param params.adbid - Database ID
+   * @param params.teamid - Team ID
+   * @param params.parentid - Target parent record ID to move under
+   */
+  async moveRecord(params: MoveRecordParams): Promise<ADORecord> {
+    return this.updateRecord({
+      meta: {
+        adoid: params.adoid,
+        adbid: params.adbid,
+        teamid: params.teamid,
+        attach: params.parentid,
+      },
+    });
   }
 
   /**

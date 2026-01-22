@@ -525,6 +525,252 @@ describeIf("AnyDBClient Integration Tests", () => {
         ).rejects.toThrow();
       });
     });
+
+    describe("copyRecord", () => {
+      it("should copy a record with no attachments", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        // Create a source record to copy
+        const sourceRecord = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Source Record ${Date.now()}`,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "original data",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+
+        expect(sourceRecord.meta.adoid).toBeTruthy();
+
+        // Copy the record
+        const copiedRecord = await client.copyRecord({
+          adoid: sourceRecord.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          attachmentsmode: "noattachments",
+        });
+
+        expect(copiedRecord.meta.adoid).toBeTruthy();
+        expect(copiedRecord.meta.adoid).not.toBe(sourceRecord.meta.adoid);
+        expect(copiedRecord.meta.name).toContain("Source Record");
+        console.log(`✓ Copied record: ${copiedRecord.meta.adoid}`);
+
+        // Cleanup
+        await client.removeRecord({
+          adoid: sourceRecord.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+        await client.removeRecord({
+          adoid: copiedRecord.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+      }, 30000);
+
+      it("should copy a record and attach to another record", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        // Create a folder to attach the copy to
+        const folder = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Target Folder ${Date.now()}`,
+          template: PredefinedTemplateAdoIds.FOLDER_TEMPLATE_ADOID,
+        });
+
+        // Create a source record
+        const sourceRecord = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Source Record ${Date.now()}`,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "data to copy",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+
+        // Copy the record and attach to folder
+        const copiedRecord = await client.copyRecord({
+          adoid: sourceRecord.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          attachto: folder.meta.adoid,
+          attachmentsmode: "duplicate",
+        });
+
+        expect(copiedRecord.meta.adoid).toBeTruthy();
+        expect(copiedRecord.meta.adoid).not.toBe(sourceRecord.meta.adoid);
+        console.log(
+          `✓ Copied record ${copiedRecord.meta.adoid} to folder ${folder.meta.adoid}`,
+        );
+
+        // Verify the copy is in the folder
+        const folderContents = await client.listRecords(
+          testTeamId,
+          testAdbId,
+          folder.meta.adoid,
+        );
+        const recordIds = folderContents.items.map((r) => r.adoid);
+        expect(recordIds).toContain(copiedRecord.meta.adoid);
+
+        // Cleanup
+        await client.removeRecord({
+          adoid: sourceRecord.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+        await client.removeRecord({
+          adoid: copiedRecord.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+        await client.removeRecord({
+          adoid: folder.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+      }, 30000);
+    });
+
+    describe("moveRecord", () => {
+      it("should move a record to a different parent folder", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        // Create source folder
+        const sourceFolder = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Source Folder ${Date.now()}`,
+          template: PredefinedTemplateAdoIds.FOLDER_TEMPLATE_ADOID,
+        });
+
+        // Create target folder
+        const targetFolder = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Target Folder ${Date.now()}`,
+          template: PredefinedTemplateAdoIds.FOLDER_TEMPLATE_ADOID,
+        });
+
+        // Create a record in source folder
+        const recordToMove = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Record to Move ${Date.now()}`,
+          attach: sourceFolder.meta.adoid,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "movable data",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+
+        // Verify record is in source folder
+        let sourceFolderContents = await client.listRecords(
+          testTeamId,
+          testAdbId,
+          sourceFolder.meta.adoid,
+        );
+        let recordIds = sourceFolderContents.items.map((r) => r.adoid);
+        expect(recordIds).toContain(recordToMove.meta.adoid);
+        console.log(
+          `✓ Record ${recordToMove.meta.adoid} created in source folder`,
+        );
+
+        // Move the record to target folder
+        const movedRecord = await client.moveRecord({
+          adoid: recordToMove.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          parentid: targetFolder.meta.adoid,
+        });
+
+        expect(movedRecord.meta.adoid).toBe(recordToMove.meta.adoid);
+        console.log(
+          `✓ Moved record ${recordToMove.meta.adoid} to target folder`,
+        );
+
+        // Verify record is now in target folder
+        const targetFolderContents = await client.listRecords(
+          testTeamId,
+          testAdbId,
+          targetFolder.meta.adoid,
+        );
+        recordIds = targetFolderContents.items.map((r) => r.adoid);
+        expect(recordIds).toContain(recordToMove.meta.adoid);
+
+        // Verify record is no longer in source folder
+        sourceFolderContents = await client.listRecords(
+          testTeamId,
+          testAdbId,
+          sourceFolder.meta.adoid,
+        );
+        recordIds = sourceFolderContents.items.map((r) => r.adoid);
+        expect(recordIds).not.toContain(recordToMove.meta.adoid);
+
+        // Cleanup
+        await client.removeRecord({
+          adoid: recordToMove.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+        await client.removeRecord({
+          adoid: sourceFolder.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+        await client.removeRecord({
+          adoid: targetFolder.meta.adoid,
+          adbid: testAdbId,
+          teamid: testTeamId,
+          removefromids: NULL_OBJECTID,
+        });
+      }, 60000);
+    });
   });
 
   describe("File Operations", () => {

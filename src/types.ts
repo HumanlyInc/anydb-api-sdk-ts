@@ -132,6 +132,7 @@ export interface UpdateRecordParams {
     followup?: number;
     locked?: boolean;
     status?: string;
+    attach?: string;
     assignees?: {
       users?: string[];
       groups?: string[];
@@ -145,6 +146,21 @@ export interface RemoveRecordParams {
   adbid: string;
   teamid: string;
   removefromids: string; // Comma-separated parent ADOIDs, or NULL_OBJECTID to delete
+}
+
+export interface CopyRecordParams {
+  adoid: string;
+  adbid: string;
+  teamid: string;
+  attachto?: string; // ID of another record to attach the copy to
+  attachmentsmode?: "noattachments" | "link" | "duplicate"; // How to handle attachments
+}
+
+export interface MoveRecordParams {
+  adoid: string; // Source record to move
+  adbid: string;
+  teamid: string;
+  parentid: string; // Target record to move under
 }
 
 export interface ListRecordsResponse {
