@@ -148,10 +148,26 @@ export class AnyDBClient {
     teamid: string,
     adbid: string,
     parentid?: string,
+    templateid?: string,
+    templatename?: string,
+    pagesize?: string,
+    lastmarker?: string,
   ): Promise<ADORecord["meta"][]> {
     const params: any = { teamid, adbid };
     if (parentid) {
       params.parentid = parentid;
+    }
+    if (templateid) {
+      params.templateid = templateid;
+    }
+    if (templatename) {
+      params.templatename = templatename;
+    }
+    if (pagesize) {
+      params.pagesize = pagesize;
+    }
+    if (lastmarker) {
+      params.lastmarker = lastmarker;
     }
     const response = await this.client.get("/integrations/ext/list", {
       params,
@@ -159,7 +175,7 @@ export class AnyDBClient {
 
     //console.log(response.data);
     if (response.data.status === "success") {
-      return response.data.data;
+      return response.data.data.items;
     }
     throw new Error(
       `Failed to list records for database ${adbid}: ${response.message}`,
@@ -386,7 +402,9 @@ export class AnyDBClient {
         file = await fs.readFile(filepath);
       } catch (error) {
         throw new Error(
-          `Failed to read file from path "${filepath}": ${error instanceof Error ? error.message : String(error)}`,
+          `Failed to read file from path "${filepath}": ${
+            error instanceof Error ? error.message : String(error)
+          }`,
         );
       }
     } else {

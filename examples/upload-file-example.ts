@@ -7,7 +7,6 @@
  */
 
 import { AnyDBClient, PredefinedTemplateAdoIds } from "anydb-api-sdk-ts";
-import { readFileSync } from "fs";
 
 const client = new AnyDBClient({
   apiKey: "your-api-key",

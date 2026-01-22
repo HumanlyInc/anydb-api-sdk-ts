@@ -134,16 +134,11 @@ async function workWithDifferentTypes(adoid: string) {
       },
       A3: {
         pos: "A3",
-        value: "2026-01-21",
-        type: ADOCellValueType.DATE,
-      },
-      A4: {
-        pos: "A4",
         value: ["item1", "item2"],
         type: ADOCellValueType.ARRAY,
       },
-      A5: {
-        pos: "A5",
+      A4: {
+        pos: "A4",
         value: { nested: "object" },
         type: ADOCellValueType.OBJECT,
       },

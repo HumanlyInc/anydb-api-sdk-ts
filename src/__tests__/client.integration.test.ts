@@ -14,7 +14,11 @@
  */
 
 import { AnyDBClient } from "../client";
-import { ADOCellValueType, NULL_OBJECTID } from "../types";
+import {
+  ADOCellValueType,
+  NULL_OBJECTID,
+  PredefinedTemplateAdoIds,
+} from "../types";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -147,6 +151,190 @@ describeIf("AnyDBClient Integration Tests", () => {
           expect(records[0]).toHaveProperty("teamid");
         }
       });
+
+      it("should navigate folder hierarchy using parentid parameter", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        // Step 1: Create a parent folder
+        const parentFolder = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Parent Folder ${Date.now()}`,
+          template: PredefinedTemplateAdoIds.FOLDER_TEMPLATE_ADOID,
+        });
+        const parentFolderId = parentFolder.meta.adoid;
+        console.log(`✓ Created parent folder: ${parentFolderId}`);
+
+        // Step 2: Create records inside the parent folder
+        const record1 = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Record 1 in Parent ${Date.now()}`,
+          attach: parentFolderId,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "record 1 data",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+
+        const record2 = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Record 2 in Parent ${Date.now()}`,
+          attach: parentFolderId,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "record 2 data",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+        console.log(`✓ Created 2 records in parent folder`);
+
+        // Step 3: Create a subfolder inside the parent folder
+        const subFolder = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Sub Folder ${Date.now()}`,
+          attach: parentFolderId,
+          template: PredefinedTemplateAdoIds.FOLDER_TEMPLATE_ADOID,
+        });
+        const subFolderId = subFolder.meta.adoid;
+        console.log(`✓ Created subfolder: ${subFolderId}`);
+
+        // Step 4: Create records inside the subfolder
+        const subRecord1 = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Record 1 in Subfolder ${Date.now()}`,
+          attach: subFolderId,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "subfolder record 1",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+
+        const subRecord2 = await client.createRecord({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          name: `Record 2 in Subfolder ${Date.now()}`,
+          attach: subFolderId,
+          content: {
+            A1: {
+              pos: "A1",
+              key: "data",
+              type: ADOCellValueType.STRING,
+              value: "subfolder record 2",
+              colspan: 1,
+              rowspan: 1,
+              props: {},
+            },
+          },
+        });
+        console.log(`✓ Created 2 records in subfolder`);
+
+        // Step 5: List records in parent folder
+        const parentFolderRecords = await client.listRecords(
+          testTeamId,
+          testAdbId,
+          parentFolderId,
+        );
+
+        expect(Array.isArray(parentFolderRecords)).toBe(true);
+        expect(parentFolderRecords.length).toBeGreaterThanOrEqual(3); // 2 records + 1 subfolder
+        console.log(
+          `✓ Found ${parentFolderRecords.length} items in parent folder`,
+        );
+
+        // Verify the records and subfolder are in the list
+        const parentRecordIds = parentFolderRecords.map((r) => r.adoid);
+        expect(parentRecordIds).toContain(record1.meta.adoid);
+        expect(parentRecordIds).toContain(record2.meta.adoid);
+        expect(parentRecordIds).toContain(subFolderId);
+
+        // Step 6: List records in subfolder
+        const subFolderRecords = await client.listRecords(
+          testTeamId,
+          testAdbId,
+          subFolderId,
+        );
+
+        expect(Array.isArray(subFolderRecords)).toBe(true);
+        expect(subFolderRecords.length).toBeGreaterThanOrEqual(2); // 2 records
+        console.log(`✓ Found ${subFolderRecords.length} items in subfolder`);
+
+        // Verify the subfolder records
+        const subRecordIds = subFolderRecords.map((r) => r.adoid);
+        expect(subRecordIds).toContain(subRecord1.meta.adoid);
+        expect(subRecordIds).toContain(subRecord2.meta.adoid);
+
+        // Cleanup: Delete all created records
+        try {
+          await client.removeRecord({
+            adoid: subRecord1.meta.adoid,
+            adbid: testAdbId,
+            teamid: testTeamId,
+            removefromids: NULL_OBJECTID,
+          });
+          await client.removeRecord({
+            adoid: subRecord2.meta.adoid,
+            adbid: testAdbId,
+            teamid: testTeamId,
+            removefromids: NULL_OBJECTID,
+          });
+          await client.removeRecord({
+            adoid: subFolderId,
+            adbid: testAdbId,
+            teamid: testTeamId,
+            removefromids: NULL_OBJECTID,
+          });
+          await client.removeRecord({
+            adoid: record1.meta.adoid,
+            adbid: testAdbId,
+            teamid: testTeamId,
+            removefromids: NULL_OBJECTID,
+          });
+          await client.removeRecord({
+            adoid: record2.meta.adoid,
+            adbid: testAdbId,
+            teamid: testTeamId,
+            removefromids: NULL_OBJECTID,
+          });
+          await client.removeRecord({
+            adoid: parentFolderId,
+            adbid: testAdbId,
+            teamid: testTeamId,
+            removefromids: NULL_OBJECTID,
+          });
+          console.log(`✓ Cleaned up all test records and folders`);
+        } catch (error) {
+          console.warn("Warning: Could not clean up test records:", error);
+        }
+      }, 60000); // 60 second timeout for this complex test
     });
 
     describe("getRecord", () => {
