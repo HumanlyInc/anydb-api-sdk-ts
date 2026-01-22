@@ -142,14 +142,18 @@ describeIf("AnyDBClient Integration Tests", () => {
           return;
         }
 
-        const records = await client.listRecords(testTeamId, testAdbId);
+        const response = await client.listRecords(testTeamId, testAdbId);
 
-        expect(Array.isArray(records)).toBe(true);
-        if (records.length > 0) {
-          expect(records[0]).toHaveProperty("adoid");
-          expect(records[0]).toHaveProperty("adbid");
-          expect(records[0]).toHaveProperty("teamid");
+        expect(response).toHaveProperty("items");
+        expect(Array.isArray(response.items)).toBe(true);
+        if (response.items.length > 0) {
+          expect(response.items[0]).toHaveProperty("adoid");
+          expect(response.items[0]).toHaveProperty("adbid");
+          expect(response.items[0]).toHaveProperty("teamid");
         }
+        // Check pagination metadata
+        expect(response).toHaveProperty("hasmore");
+        expect(response).toHaveProperty("total");
       });
 
       it("should navigate folder hierarchy using parentid parameter", async () => {
@@ -258,37 +262,41 @@ describeIf("AnyDBClient Integration Tests", () => {
         console.log(`✓ Created 2 records in subfolder`);
 
         // Step 5: List records in parent folder
-        const parentFolderRecords = await client.listRecords(
+        const parentFolderResponse = await client.listRecords(
           testTeamId,
           testAdbId,
           parentFolderId,
         );
 
-        expect(Array.isArray(parentFolderRecords)).toBe(true);
-        expect(parentFolderRecords.length).toBeGreaterThanOrEqual(3); // 2 records + 1 subfolder
+        expect(parentFolderResponse).toHaveProperty("items");
+        expect(Array.isArray(parentFolderResponse.items)).toBe(true);
+        expect(parentFolderResponse.items.length).toBeGreaterThanOrEqual(3); // 2 records + 1 subfolder
         console.log(
-          `✓ Found ${parentFolderRecords.length} items in parent folder`,
+          `✓ Found ${parentFolderResponse.items.length} items in parent folder`,
         );
 
         // Verify the records and subfolder are in the list
-        const parentRecordIds = parentFolderRecords.map((r) => r.adoid);
+        const parentRecordIds = parentFolderResponse.items.map((r) => r.adoid);
         expect(parentRecordIds).toContain(record1.meta.adoid);
         expect(parentRecordIds).toContain(record2.meta.adoid);
         expect(parentRecordIds).toContain(subFolderId);
 
         // Step 6: List records in subfolder
-        const subFolderRecords = await client.listRecords(
+        const subFolderResponse = await client.listRecords(
           testTeamId,
           testAdbId,
           subFolderId,
         );
 
-        expect(Array.isArray(subFolderRecords)).toBe(true);
-        expect(subFolderRecords.length).toBeGreaterThanOrEqual(2); // 2 records
-        console.log(`✓ Found ${subFolderRecords.length} items in subfolder`);
+        expect(subFolderResponse).toHaveProperty("items");
+        expect(Array.isArray(subFolderResponse.items)).toBe(true);
+        expect(subFolderResponse.items.length).toBeGreaterThanOrEqual(2); // 2 records
+        console.log(
+          `✓ Found ${subFolderResponse.items.length} items in subfolder`,
+        );
 
         // Verify the subfolder records
-        const subRecordIds = subFolderRecords.map((r) => r.adoid);
+        const subRecordIds = subFolderResponse.items.map((r) => r.adoid);
         expect(subRecordIds).toContain(subRecord1.meta.adoid);
         expect(subRecordIds).toContain(subRecord2.meta.adoid);
 

@@ -12,6 +12,7 @@ import type {
   CreateRecordParams,
   UpdateRecordParams,
   RemoveRecordParams,
+  ListRecordsResponse,
   SearchRecordsParams,
   DownloadFileParams,
   DownloadFileResponse,
@@ -45,14 +46,14 @@ export class AnyDBClient {
       (config) => {
         const maskedKey = this.apiKey
           ? `${this.apiKey.substring(0, 8)}...${this.apiKey.substring(
-              this.apiKey.length - 4,
+              this.apiKey.length - 4
             )}`
           : "none";
         if (process.env.DEBUG_ANYDB) {
           console.log(
             `[AnyDB Request] ${config.method?.toUpperCase()} ${config.baseURL}${
               config.url
-            }`,
+            }`
           );
           console.log(`[AnyDB Request] API Key: ${maskedKey}`);
           console.log(`[AnyDB Request] User Email: ${this.userEmail}`);
@@ -61,7 +62,7 @@ export class AnyDBClient {
       },
       (error) => {
         return Promise.reject(error);
-      },
+      }
     );
 
     // Add response interceptor for logging (optional, can be disabled)
@@ -69,7 +70,7 @@ export class AnyDBClient {
       (response) => {
         if (process.env.DEBUG_ANYDB) {
           console.log(
-            `[AnyDB Response] Status: ${response.status} ${response.message}`,
+            `[AnyDB Response] Status: ${response.status} ${response.message}`
           );
         }
         return response;
@@ -81,14 +82,14 @@ export class AnyDBClient {
             error.response.data?.error ||
             error.response.statusText;
           throw new Error(
-            `AnyDB API Error (${error.response.status}): ${errorMsg}`,
+            `AnyDB API Error (${error.response.status}): ${errorMsg}`
           );
         } else if (error.request) {
           throw new Error("AnyDB API Error: No response received from server");
         } else {
           throw new Error(`AnyDB API Error: ${error.message}`);
         }
-      },
+      }
     );
   }
 
@@ -102,7 +103,7 @@ export class AnyDBClient {
   async getRecord(
     teamid: string,
     adbid: string,
-    adoid: string,
+    adoid: string
   ): Promise<ADORecord> {
     const response = await this.client.get("/integrations/ext/record", {
       params: { teamid, adbid, adoid },
@@ -137,7 +138,7 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to list databases for team ${teamid}: ${response.message}`,
+      `Failed to list databases for team ${teamid}: ${response.message}`
     );
   }
 
@@ -151,8 +152,8 @@ export class AnyDBClient {
     templateid?: string,
     templatename?: string,
     pagesize?: string,
-    lastmarker?: string,
-  ): Promise<ADORecord["meta"][]> {
+    lastmarker?: string
+  ): Promise<ListRecordsResponse> {
     const params: any = { teamid, adbid };
     if (parentid) {
       params.parentid = parentid;
@@ -175,10 +176,16 @@ export class AnyDBClient {
 
     //console.log(response.data);
     if (response.data.status === "success") {
-      return response.data.data.items;
+      // Return full response with pagination metadata
+      return {
+        items: response.data.data.items || response.data.data,
+        lastmarker: response.data.data.lastmarker,
+        hasmore: response.data.data.hasmore,
+        total: response.data.data.total,
+      };
     }
     throw new Error(
-      `Failed to list records for database ${adbid}: ${response.message}`,
+      `Failed to list records for database ${adbid}: ${response.message}`
     );
   }
 
@@ -188,7 +195,7 @@ export class AnyDBClient {
   async createRecord(params: CreateRecordParams): Promise<ADORecord> {
     const response = await this.client.post(
       "/integrations/ext/createrecord",
-      params,
+      params
     );
 
     if (response.data.status === "success") {
@@ -203,7 +210,7 @@ export class AnyDBClient {
   async updateRecord(params: UpdateRecordParams): Promise<ADORecord> {
     const response = await this.client.put(
       "/integrations/ext/updaterecord",
-      params,
+      params
     );
     if (response.data.status === "success") {
       return response.data.data;
@@ -252,7 +259,7 @@ export class AnyDBClient {
    * If redirect is false, returns the file URL in response
    */
   async downloadFile(
-    params: DownloadFileParams,
+    params: DownloadFileParams
   ): Promise<DownloadFileResponse> {
     const queryParams: any = {
       teamid: params.teamid,
@@ -315,7 +322,7 @@ export class AnyDBClient {
   async uploadFileToUrl(
     uploadUrl: string,
     fileContent: Buffer | string,
-    contentType?: string,
+    contentType?: string
   ): Promise<void> {
     await axios.put(uploadUrl, fileContent, {
       headers: {
@@ -391,7 +398,7 @@ export class AnyDBClient {
     }
     if (filepath && fileContent) {
       throw new Error(
-        "Cannot provide both filepath and fileContent. Choose one.",
+        "Cannot provide both filepath and fileContent. Choose one."
       );
     }
 
@@ -404,7 +411,7 @@ export class AnyDBClient {
         throw new Error(
           `Failed to read file from path "${filepath}": ${
             error instanceof Error ? error.message : String(error)
-          }`,
+          }`
         );
       }
     } else {

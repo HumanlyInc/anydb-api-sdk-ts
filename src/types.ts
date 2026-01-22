@@ -147,6 +147,13 @@ export interface RemoveRecordParams {
   removefromids: string; // Comma-separated parent ADOIDs, or NULL_OBJECTID to delete
 }
 
+export interface ListRecordsResponse {
+  items: ADORecord["meta"][];
+  lastmarker?: string;
+  hasmore?: boolean;
+  total?: number;
+}
+
 export interface SearchRecordsParams {
   adbid: string;
   teamid: string;
