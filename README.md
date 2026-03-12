@@ -206,6 +206,57 @@ const results = await client.searchRecords({
 // Returns: ADORecord[]
 ```
 
+#### Create Public Share Link
+
+Create a public share link for a record with sensible defaults.
+
+```typescript
+const share = await client.createPublicShareLink({
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "adoid",
+  // Optional:
+  // role: "viewer" | "editor" (default: "viewer")
+  // withattachments: boolean (default: false)
+  // name: string
+  // shareExpiryDate:  unix timestamp
+});
+
+console.log(share);
+```
+
+#### Create Private Share Link
+
+Create a private share link for one or more specific user IDs.
+
+```typescript
+const privateShare = await client.createPrivateShareLink({
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "adoid",
+  userIds: ["111111111111111111111111", "222222222222222222222222"],
+  // groupIds: ["333333333333333333333333"],
+  // Optional:
+  // role: "viewer" | "editor" (default: "viewer")
+  // withattachments: boolean (default: false)
+  // name: string
+  // shareExpiryDate: unix timestamp
+});
+
+console.log(privateShare);
+```
+
+#### Delete Share
+
+Delete an existing share by `shareid` (uses `sharetype: "item"`).
+
+```typescript
+await client.deleteShare({
+  shareid: "shareid",
+  teamid: "teamid",
+});
+```
+
 ### File Operations
 
 #### Download File

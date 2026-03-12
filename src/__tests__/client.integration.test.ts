@@ -43,6 +43,9 @@ describeIf("AnyDBClient Integration Tests", () => {
   // Test data from environment
   const testTeamId = process.env.ANYDB_TEST_TEAM_ID || "";
   const testAdbId = process.env.ANYDB_TEST_ADB_ID || "";
+  const privateShareUserId =
+    process.env.ANYDB_TEST_PRIVATE_SHARE_USER_ID || "6977ce2c0be158a090665453";
+  const privateShareGroupId = process.env.ANYDB_TEST_PRIVATE_SHARE_GROUP_ID;
 
   // Test ADO will be created dynamically
   let testAdoId = "";
@@ -476,6 +479,130 @@ describeIf("AnyDBClient Integration Tests", () => {
           expect(updatedRecord.content.B1?.value).toBe("updated value");
         }
       });
+    });
+
+    describe("createPublicShareLink", () => {
+      it("should create a public share link with defaults and expiry", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!testAdoId) {
+          console.warn("Skipping: Test ADO was not created");
+          return;
+        }
+
+        const expiryInFuture = Date.now() + 24 * 60 * 60 * 1000;
+
+        const shareResponse = await client.createPublicShareLink({
+          teamid: testTeamId,
+          adbid: testAdbId,
+          adoid: testAdoId,
+          shareExpiryDate: expiryInFuture,
+        });
+
+        expect(shareResponse).toBeDefined();
+        expect(typeof shareResponse).toBe("object");
+        expect(shareResponse).not.toBeNull();
+      }, 30000);
+    });
+
+    describe("createPrivateShareLink", () => {
+      it("should create a private share link for one or more users", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!testAdoId) {
+          console.warn("Skipping: Test ADO was not created");
+          return;
+        }
+
+        const expiryInFuture = Date.now() + 24 * 60 * 60 * 1000;
+
+        const privateShareParams: any = {
+          teamid: testTeamId,
+          adbid: testAdbId,
+          adoid: testAdoId,
+          userIds: [privateShareUserId],
+          shareExpiryDate: expiryInFuture,
+        };
+
+        if (privateShareGroupId) {
+          privateShareParams.groupIds = [privateShareGroupId];
+        }
+
+        const privateShareResponse =
+          await client.createPrivateShareLink(privateShareParams);
+
+        expect(privateShareResponse).toBeDefined();
+        expect(typeof privateShareResponse).toBe("object");
+        expect(privateShareResponse).not.toBeNull();
+      }, 30000);
+    });
+
+    describe("deleteShare", () => {
+      it("should delete an item share by shareid", async () => {
+        if (!testTeamId || !testAdbId) {
+          console.warn(
+            "Skipping: ANYDB_TEST_TEAM_ID or ANYDB_TEST_ADB_ID not set",
+          );
+          return;
+        }
+
+        if (!testAdoId) {
+          console.warn("Skipping: Test ADO was not created");
+          return;
+        }
+
+        const privateShareParams: any = {
+          teamid: testTeamId,
+          adbid: testAdbId,
+          adoid: testAdoId,
+          userIds: [privateShareUserId],
+        };
+
+        if (privateShareGroupId) {
+          privateShareParams.groupIds = [privateShareGroupId];
+        }
+
+        const createdShare =
+          await client.createPrivateShareLink(privateShareParams);
+
+        const shareIdCandidates = [
+          createdShare?.shareid,
+          createdShare?.id,
+          createdShare?._id,
+          createdShare?.meta?.shareid,
+          createdShare?.meta?.id,
+          createdShare?.meta?._id,
+        ];
+        const shareid = shareIdCandidates.find(
+          (value): value is string =>
+            typeof value === "string" && value.length > 0,
+        );
+
+        if (!shareid) {
+          throw new Error(
+            `Unable to determine shareid from createPrivateShareLink response: ${JSON.stringify(createdShare)}`,
+          );
+        }
+
+        const deleteResponse = await client.deleteShare({
+          shareid,
+          teamid: testTeamId,
+        });
+
+        if (deleteResponse !== undefined) {
+          expect(typeof deleteResponse).toBe("object");
+        }
+      }, 30000);
     });
 
     describe("removeRecord", () => {

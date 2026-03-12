@@ -4,6 +4,7 @@
 
 // Special Object IDs
 export const NULL_OBJECTID = "000000000000000000000000";
+export const PUBLIC_USER_ID = "777788881111111111111000";
 
 // Predefined Template IDs
 export enum PredefinedTemplateAdoIds {
@@ -213,6 +214,45 @@ export interface CompleteUploadParams {
   adbid: string;
   adoid?: string;
   cellpos?: string;
+}
+
+export interface CreatePublicShareLinkParams {
+  teamid: string;
+  adbid: string;
+  adoid: string;
+  role?: "viewer" | "editor";
+  withattachments?: boolean;
+  name?: string;
+  shareExpiryDate?: Date | number;
+}
+
+export interface PublicShareLinkResponse {
+  [key: string]: any;
+}
+
+export interface CreatePrivateShareLinkParams {
+  teamid: string;
+  adbid: string;
+  adoid: string;
+  userIds: string[] | string;
+  groupIds?: string[] | string;
+  role?: "viewer" | "editor";
+  withattachments?: boolean;
+  name?: string;
+  shareExpiryDate?: Date | number;
+}
+
+export interface PrivateShareLinkResponse {
+  [key: string]: any;
+}
+
+export interface DeleteShareParams {
+  shareid: string;
+  teamid: string;
+}
+
+export interface DeleteShareResponse {
+  [key: string]: any;
 }
 
 export interface AnyDBClientConfig {

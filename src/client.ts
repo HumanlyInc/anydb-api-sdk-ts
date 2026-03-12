@@ -20,9 +20,15 @@ import type {
   DownloadFileResponse,
   GetUploadUrlParams,
   CompleteUploadParams,
+  CreatePublicShareLinkParams,
+  PublicShareLinkResponse,
+  CreatePrivateShareLinkParams,
+  PrivateShareLinkResponse,
+  DeleteShareParams,
+  DeleteShareResponse,
   AnyDBClientConfig,
 } from "./types.js";
-import { PredefinedTemplateAdoIds } from "./types.js";
+import { PredefinedTemplateAdoIds, PUBLIC_USER_ID } from "./types.js";
 
 export class AnyDBClient {
   private client: AxiosInstance;
@@ -79,6 +85,14 @@ export class AnyDBClient {
       },
       (error) => {
         if (error.response) {
+          if (process.env.DEBUG_ANYDB) {
+            console.log(
+              `[AnyDB Response Error] Status: ${error.response.status}`,
+            );
+            console.log(
+              `[AnyDB Response Error] Data: ${JSON.stringify(error.response.data)}`,
+            );
+          }
           const errorMsg =
             error.response.data?.message ||
             error.response.data?.error ||
@@ -300,6 +314,152 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(`Failed to search records: ${response.message}`);
+  }
+
+  /**
+   * Create a public share link for a record
+   * By default this creates a viewer link without attachments
+   */
+  async createPublicShareLink(
+    params: CreatePublicShareLinkParams,
+  ): Promise<PublicShareLinkResponse> {
+    const {
+      teamid,
+      adbid,
+      adoid,
+      role = "viewer",
+      withattachments = false,
+      name,
+      shareExpiryDate,
+    } = params;
+
+    const requestBody: Record<string, unknown> = {
+      teamid,
+      adbid,
+      adoid,
+      role,
+      withattachments: withattachments ? "true" : "false",
+      shared_userids: PUBLIC_USER_ID,
+      share_expiry_enable: shareExpiryDate !== undefined,
+    };
+
+    if (name) {
+      requestBody.name = name;
+    }
+
+    if (shareExpiryDate !== undefined) {
+      const rawUnixTimestamp =
+        shareExpiryDate instanceof Date
+          ? shareExpiryDate.getTime()
+          : shareExpiryDate;
+
+      requestBody.share_expiry_date =
+        rawUnixTimestamp < 1_000_000_000_000
+          ? Math.floor(rawUnixTimestamp * 1000).toString()
+          : Math.floor(rawUnixTimestamp).toString();
+    }
+
+    const response = await this.client.put(
+      "/integrations/ext/share",
+      requestBody,
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to create public share link: ${response.message}`);
+  }
+
+  /**
+   * Create a private share link for one or more users
+   */
+  async createPrivateShareLink(
+    params: CreatePrivateShareLinkParams,
+  ): Promise<PrivateShareLinkResponse> {
+    const {
+      teamid,
+      adbid,
+      adoid,
+      userIds,
+      groupIds,
+      role = "viewer",
+      withattachments = false,
+      name,
+      shareExpiryDate,
+    } = params;
+
+    const normalizedUserIds = Array.isArray(userIds) ? userIds : [userIds];
+    if (normalizedUserIds.length === 0) {
+      throw new Error("createPrivateShareLink requires at least one user ID");
+    }
+    const normalizedGroupIds = groupIds
+      ? Array.isArray(groupIds)
+        ? groupIds
+        : [groupIds]
+      : [];
+
+    const requestBody: Record<string, unknown> = {
+      teamid,
+      adbid,
+      adoid,
+      role,
+      withattachments: withattachments ? "true" : "false",
+      shared_userids: normalizedUserIds.join(","),
+      share_expiry_enable: shareExpiryDate !== undefined,
+    };
+
+    if (normalizedGroupIds.length > 0) {
+      requestBody.shared_groupids = normalizedGroupIds.join(",");
+    }
+
+    if (name) {
+      requestBody.name = name;
+    }
+
+    if (shareExpiryDate !== undefined) {
+      const rawUnixTimestamp =
+        shareExpiryDate instanceof Date
+          ? shareExpiryDate.getTime()
+          : shareExpiryDate;
+
+      requestBody.share_expiry_date =
+        rawUnixTimestamp < 1_000_000_000_000
+          ? Math.floor(rawUnixTimestamp * 1000).toString()
+          : Math.floor(rawUnixTimestamp).toString();
+    }
+
+    const response = await this.client.put(
+      "/integrations/ext/share",
+      requestBody,
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to create private share link: ${response.message}`);
+  }
+
+  /**
+   * Delete a share by share ID
+   * Uses fixed sharetype "item"
+   */
+  async deleteShare(params: DeleteShareParams): Promise<DeleteShareResponse> {
+    const response = await this.client.delete(
+      `/integrations/ext/share/${params.shareid}`,
+      {
+        params: {
+          teamid: params.teamid,
+          sharetype: "item",
+        },
+      },
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to delete share ${params.shareid}: ${response.message}`,
+    );
   }
 
   // ============================================================================
