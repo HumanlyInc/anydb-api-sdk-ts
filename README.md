@@ -210,6 +210,10 @@ const results = await client.searchRecords({
 
 Create a public share link for a record with sensible defaults.
 
+- Uses `PUBLIC_USER_ID` internally for public sharing
+- Default `role` is `"viewer"`
+- Default `withattachments` is `false`
+
 ```typescript
 const share = await client.createPublicShareLink({
   teamid: "teamid",
@@ -228,6 +232,11 @@ console.log(share);
 #### Create Private Share Link
 
 Create a private share link for one or more specific user IDs.
+
+- `userIds` is required (string or string[])
+- `groupIds` is optional (string or string[])
+- Default `role` is `"viewer"`
+- Default `withattachments` is `false`
 
 ```typescript
 const privateShare = await client.createPrivateShareLink({
@@ -253,6 +262,26 @@ Delete an existing share by `shareid` (uses `sharetype: "item"`).
 ```typescript
 await client.deleteShare({
   shareid: "shareid",
+  teamid: "teamid",
+});
+```
+
+#### Share Lifecycle Example
+
+Create a private share, then delete it.
+
+```typescript
+const created = await client.createPrivateShareLink({
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "adoid",
+  userIds: ["111111111111111111111111"],
+});
+
+const shareid = created.shareid || created.id || created._id;
+
+await client.deleteShare({
+  shareid,
   teamid: "teamid",
 });
 ```
