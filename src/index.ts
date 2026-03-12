@@ -20,6 +20,12 @@ export type {
   GetUploadUrlParams,
   GetUploadUrlResponse,
   CompleteUploadParams,
+  CreatePublicShareLinkParams,
+  PublicShareLinkResponse,
+  CreatePrivateShareLinkParams,
+  PrivateShareLinkResponse,
+  DeleteShareParams,
+  DeleteShareResponse,
   AnyDBClientConfig,
 } from "./types.js";
 export {
@@ -27,4 +33,5 @@ export {
   ADOCellValueType,
   ADOCellFormat,
   NULL_OBJECTID,
+  PUBLIC_USER_ID,
 } from "./types.js";
