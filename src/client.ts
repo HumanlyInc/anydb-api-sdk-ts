@@ -40,7 +40,7 @@ export class AnyDBClient {
     this.userEmail = config.userEmail;
 
     this.client = axios.create({
-      baseURL: config.baseURL || "http://app.anydb.com/api",
+      baseURL: config.baseURL || "https://app.anydb.com/api",
       headers: {
         "Content-Type": "application/json",
         "x-anydb-api-key": this.apiKey,
@@ -365,7 +365,24 @@ export class AnyDBClient {
     );
 
     if (response.data.status === "success") {
-      return response.data.data;
+      const responseData = response.data.data || {};
+      const shareid: string | undefined = responseData.shareid;
+      const shareToken: string | undefined =
+        responseData.shareUrl || responseData.shareurl;
+
+      const configuredBaseUrl = this.client.defaults.baseURL || "";
+      const serverBaseUrl = configuredBaseUrl.replace(/\/api\/?$/, "");
+
+      if (!shareid || !shareToken) {
+        throw new Error(
+          "Failed to create public share link: Missing shareid or shareUrl in response",
+        );
+      }
+
+      return {
+        shareid,
+        url: `${serverBaseUrl}/s/${shareToken}`,
+      };
     }
     throw new Error(`Failed to create public share link: ${response.message}`);
   }

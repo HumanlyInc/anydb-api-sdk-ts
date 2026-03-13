@@ -227,7 +227,8 @@ export interface CreatePublicShareLinkParams {
 }
 
 export interface PublicShareLinkResponse {
-  [key: string]: any;
+  shareid: string;
+  url: string;
 }
 
 export interface CreatePrivateShareLinkParams {

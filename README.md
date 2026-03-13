@@ -49,7 +49,7 @@ import { AnyDBClient } from "anydb-api-sdk-ts";
 const client = new AnyDBClient({
   apiKey: "your-api-key",
   userEmail: "user@example.com",
-  baseURL: "https://app.anydb.com/api", // Optional, defaults to localhost
+  baseURL: "https://app.anydb.com/api", // Optional, defaults to https://app.anydb.com/api
 });
 
 // List teams
@@ -79,7 +79,7 @@ console.log("Record:", record);
 const client = new AnyDBClient({
   apiKey: string;        // Required: Your AnyDB API key
   userEmail: string;     // Required: User email for authentication
-  baseURL?: string;      // Optional: API base URL (default: http://localhost:3000/api)
+  baseURL?: string;      // Optional: API base URL (default: https://app.anydb.com/api)
   timeout?: number;      // Optional: Request timeout in ms (default: 30000)
 });
 ```
@@ -213,6 +213,9 @@ Create a public share link for a record with sensible defaults.
 - Uses `PUBLIC_USER_ID` internally for public sharing
 - Default `role` is `"viewer"`
 - Default `withattachments` is `false`
+- Returns a normalized response:
+  - `shareid: string`
+  - `url: string` (constructed as `ServerURL/s/<shareurl>`)
 
 ```typescript
 const share = await client.createPublicShareLink({
@@ -226,7 +229,14 @@ const share = await client.createPublicShareLink({
   // shareExpiryDate:  unix timestamp
 });
 
-console.log(share);
+console.log(share.shareid);
+console.log(share.url); // ServerURL/s/<shareurl>
+
+// Example response:
+// {
+//   shareid: "69b4630808d687c2ee7b0662",
+//   url: "https://app.anydb.com/s/87298a706c8ae9d1"
+// }
 ```
 
 #### Create Private Share Link
