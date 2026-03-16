@@ -605,6 +605,192 @@ describeIf("AnyDBClient Integration Tests", () => {
       }, 30000);
     });
 
+    describe("Webhook Operations", () => {
+      const createWebhookUrl = (suffix: string): string =>
+        `https://example.com/anydb-sdk-webhook/${suffix}-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 10)}`;
+
+      const createWebhookName = (prefix: string): string =>
+        `${prefix} ${new Date().toISOString()}`;
+
+      const safeDeleteWebhook = async (webhookId: string): Promise<void> => {
+        try {
+          await client.deleteWebhook(webhookId);
+        } catch (error) {
+          console.warn(`Warning: Could not delete webhook ${webhookId}`, error);
+        }
+      };
+
+      it("should register a webhook", async () => {
+        if (!testTeamId) {
+          console.warn("Skipping: ANYDB_TEST_TEAM_ID not set");
+          return;
+        }
+
+        const registration = await client.registerWebhook({
+          teamid: testTeamId,
+          url: createWebhookUrl("register"),
+          name: createWebhookName("SDK Register Test Webhook"),
+          description: "Integration test for registerWebhook",
+          timeout: 15000,
+          maxRetries: 2,
+          backoffMs: 500,
+          customHeaders: {
+            "x-sdk-test": "register",
+          },
+        });
+
+        expect(registration).toBeDefined();
+        expect(registration.webhook).toBeDefined();
+        expect(registration.webhook.webhookId).toBeTruthy();
+        expect(registration.webhook.teamid).toBe(testTeamId);
+        expect(registration.secret).toBeTruthy();
+
+        await safeDeleteWebhook(registration.webhook.webhookId);
+      }, 30000);
+
+      it("should update a webhook", async () => {
+        if (!testTeamId) {
+          console.warn("Skipping: ANYDB_TEST_TEAM_ID not set");
+          return;
+        }
+
+        const registration = await client.registerWebhook({
+          teamid: testTeamId,
+          url: createWebhookUrl("update-base"),
+          name: createWebhookName("SDK Update Base Webhook"),
+        });
+
+        const webhookId = registration.webhook.webhookId;
+
+        try {
+          const updated = await client.updateWebhook({
+            webhookId,
+            name: createWebhookName("SDK Updated Webhook"),
+            description: "Updated by SDK integration test",
+            url: createWebhookUrl("update-target"),
+            timeout: 20000,
+            customHeaders: {
+              "x-sdk-test": "update",
+              Authorization: "Bearer sdk-test-token",
+            },
+          });
+
+          expect(updated).toBeDefined();
+          expect(updated.webhook).toBeDefined();
+          expect(updated.webhook.webhookId).toBe(webhookId);
+          expect(updated.webhook.description).toBe(
+            "Updated by SDK integration test",
+          );
+          expect(updated.webhook.timeout).toBe(20000);
+          expect(updated.webhook.customHeaders).toBeDefined();
+          expect(updated.webhook.customHeaders?.["x-sdk-test"]).toBe("update");
+        } finally {
+          await safeDeleteWebhook(webhookId);
+        }
+      }, 30000);
+
+      it("should subscribe a webhook to RECORD_CREATE", async () => {
+        if (!testTeamId) {
+          console.warn("Skipping: ANYDB_TEST_TEAM_ID not set");
+          return;
+        }
+
+        const registration = await client.registerWebhook({
+          teamid: testTeamId,
+          url: createWebhookUrl("subscribe"),
+          name: createWebhookName("SDK Subscribe Test Webhook"),
+        });
+
+        const webhookId = registration.webhook.webhookId;
+
+        try {
+          const subscription = await client.subscribeWebhook({
+            webhookId,
+            event: "RECORD_CREATE",
+          });
+
+          expect(subscription).toBeDefined();
+          expect(subscription.webhookId).toBe(webhookId);
+          expect(subscription.teamid).toBe(testTeamId);
+          expect(subscription.event).toBe("RECORD_CREATE");
+          expect(subscription.subscribed).toBe(true);
+        } finally {
+          try {
+            await client.unsubscribeWebhook({
+              webhookId,
+              event: "RECORD_CREATE",
+            });
+          } catch (error) {
+            console.warn(
+              `Warning: Could not unsubscribe webhook ${webhookId} during cleanup`,
+              error,
+            );
+          }
+          await safeDeleteWebhook(webhookId);
+        }
+      }, 30000);
+
+      it("should unsubscribe a webhook from RECORD_UPDATE", async () => {
+        if (!testTeamId) {
+          console.warn("Skipping: ANYDB_TEST_TEAM_ID not set");
+          return;
+        }
+
+        const registration = await client.registerWebhook({
+          teamid: testTeamId,
+          url: createWebhookUrl("unsubscribe"),
+          name: createWebhookName("SDK Unsubscribe Test Webhook"),
+        });
+
+        const webhookId = registration.webhook.webhookId;
+
+        try {
+          const subscribeResponse = await client.subscribeWebhook({
+            webhookId,
+            event: "RECORD_UPDATE",
+          });
+
+          expect(subscribeResponse.subscribed).toBe(true);
+          expect(subscribeResponse.event).toBe("RECORD_UPDATE");
+
+          const unsubscribeResponse = await client.unsubscribeWebhook({
+            webhookId,
+            event: "RECORD_UPDATE",
+          });
+
+          expect(unsubscribeResponse).toBeDefined();
+          expect(unsubscribeResponse.webhookId).toBe(webhookId);
+          expect(unsubscribeResponse.teamid).toBe(testTeamId);
+          expect(unsubscribeResponse.event).toBe("RECORD_UPDATE");
+          expect(unsubscribeResponse.unsubscribed).toBe(true);
+        } finally {
+          await safeDeleteWebhook(webhookId);
+        }
+      }, 30000);
+
+      it("should delete a webhook", async () => {
+        if (!testTeamId) {
+          console.warn("Skipping: ANYDB_TEST_TEAM_ID not set");
+          return;
+        }
+
+        const registration = await client.registerWebhook({
+          teamid: testTeamId,
+          url: createWebhookUrl("delete"),
+          name: createWebhookName("SDK Delete Test Webhook"),
+        });
+
+        const webhookId = registration.webhook.webhookId;
+
+        const deleteResponse = await client.deleteWebhook(webhookId);
+
+        expect(deleteResponse).toBeDefined();
+        expect(deleteResponse.success).toBe(true);
+      }, 30000);
+    });
+
     describe("removeRecord", () => {
       it("should remove a record completely when using NULL_OBJECTID", async () => {
         if (!testTeamId || !testAdbId) {
@@ -1005,6 +1191,51 @@ describeIf("AnyDBClient Integration Tests", () => {
   });
 
   describe("Error Handling", () => {
+    it("should reject listTeams with invalid API key", async () => {
+      const invalidApiKeyClient = new AnyDBClient({
+        baseURL: process.env.ANYDB_BASE_URL!,
+        apiKey: "invalid-api-key",
+        userEmail: process.env.ANYDB_USER_EMAIL!,
+      });
+
+      await expect(invalidApiKeyClient.listTeams()).rejects.toThrow(
+        /401|Invalid user|API Key/i,
+      );
+    });
+
+    it("should reject listTeams with invalid user email", async () => {
+      const invalidEmailClient = new AnyDBClient({
+        baseURL: process.env.ANYDB_BASE_URL!,
+        apiKey: process.env.ANYDB_API_KEY!,
+        userEmail: "invalid-user-email",
+      });
+
+      await expect(invalidEmailClient.listTeams()).rejects.toThrow(
+        /401|Invalid user|User email/i,
+      );
+    });
+
+    it("should reject registerWebhook with invalid API key", async () => {
+      if (!testTeamId) {
+        console.warn("Skipping: ANYDB_TEST_TEAM_ID not set");
+        return;
+      }
+
+      const invalidApiKeyClient = new AnyDBClient({
+        baseURL: process.env.ANYDB_BASE_URL!,
+        apiKey: "invalid-api-key",
+        userEmail: process.env.ANYDB_USER_EMAIL!,
+      });
+
+      await expect(
+        invalidApiKeyClient.registerWebhook({
+          teamid: testTeamId,
+          url: `https://example.com/anydb-sdk-auth-test-${Date.now()}`,
+          name: `Auth Test Webhook ${Date.now()}`,
+        }),
+      ).rejects.toThrow(/401|Invalid user|API Key/i);
+    });
+
     it("should throw error for invalid record", async () => {
       await expect(
         client.getRecord("invalid-team", "invalid-db", "invalid-record"),
