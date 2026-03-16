@@ -26,6 +26,14 @@ import type {
   PrivateShareLinkResponse,
   DeleteShareParams,
   DeleteShareResponse,
+  RegisterWebhookParams,
+  RegisterWebhookResponse,
+  UpdateWebhookParams,
+  UpdateWebhookResponse,
+  DeleteWebhookResponse,
+  SubscribeWebhookParams,
+  SubscribeWebhookResponse,
+  UnsubscribeWebhookResponse,
   AnyDBClientConfig,
 } from "./types.js";
 import { PredefinedTemplateAdoIds, PUBLIC_USER_ID } from "./types.js";
@@ -476,6 +484,99 @@ export class AnyDBClient {
     }
     throw new Error(
       `Failed to delete share ${params.shareid}: ${response.message}`,
+    );
+  }
+
+  // ============================================================================
+  // Webhook Operations
+  // ============================================================================
+
+  /**
+   * Register a new webhook for a team
+   * Returns webhook metadata and a one-time secret
+   */
+  async registerWebhook(
+    params: RegisterWebhookParams,
+  ): Promise<RegisterWebhookResponse> {
+    const response = await this.client.post(
+      "/integrations/ext/register",
+      params,
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(`Failed to register webhook: ${response.message}`);
+  }
+
+  /**
+   * Update an existing webhook
+   */
+  async updateWebhook(
+    params: UpdateWebhookParams,
+  ): Promise<UpdateWebhookResponse> {
+    const { webhookId, ...updateBody } = params;
+    const response = await this.client.put(
+      `/integrations/ext/${webhookId}`,
+      updateBody,
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to update webhook ${webhookId}: ${response.message}`,
+    );
+  }
+
+  /**
+   * Delete a webhook by ID
+   */
+  async deleteWebhook(webhookId: string): Promise<DeleteWebhookResponse> {
+    const response = await this.client.delete(`/integrations/ext/${webhookId}`);
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to delete webhook ${webhookId}: ${response.message}`,
+    );
+  }
+
+  /**
+   * Subscribe a webhook to a record event
+   */
+  async subscribeWebhook(
+    params: SubscribeWebhookParams,
+  ): Promise<SubscribeWebhookResponse> {
+    const response = await this.client.post(
+      "/integrations/ext/subscribe",
+      params,
+    );
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to subscribe webhook ${params.webhookId}: ${response.message}`,
+    );
+  }
+
+  /**
+   * Unsubscribe a webhook from a record event
+   */
+  async unsubscribeWebhook(
+    params: SubscribeWebhookParams,
+  ): Promise<UnsubscribeWebhookResponse> {
+    const response = await this.client.delete("/integrations/ext/unsubscribe", {
+      data: params,
+    });
+
+    if (response.data.status === "success") {
+      return response.data.data;
+    }
+    throw new Error(
+      `Failed to unsubscribe webhook ${params.webhookId}: ${response.message}`,
     );
   }
 

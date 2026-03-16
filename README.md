@@ -31,7 +31,9 @@ npm install anydb-api-sdk-ts
 
 ## Getting Your API Key
 
-Before using the SDK, you'll need to obtain your API key from [AnyDB](https://www.anydb.com):
+Before using the SDK, you'll need to obtain your API key from [AnyDB](https://www.anydb.com).
+
+For the latest instructions, see: [TypeScript SDK Integration Guide](https://www.anydb.com/support/integrations/typescript-sdk).
 
 1. Log in to your AnyDB account at [app.anydb.com](https://app.anydb.com)
 2. Click on the **user icon** in the bottom right corner of the browser UI
@@ -65,6 +67,8 @@ console.log("Record:", record);
 
 - ✅ **Full TypeScript support** with type definitions
 - ✅ **Record operations** - CRUD operations for AnyDB records
+- ✅ **Share operations** - Create and delete public/private record share links
+- ✅ **Webhook integrations** - Register, update, delete, subscribe, and unsubscribe webhooks
 - ✅ **File management** - Upload and download files from record cells
 - ✅ **Team & database discovery** - List teams and databases
 - ✅ **Search functionality** - Search records by keyword
@@ -293,6 +297,75 @@ const shareid = created.shareid || created.id || created._id;
 await client.deleteShare({
   shareid,
   teamid: "teamid",
+});
+```
+
+### Webhook Operations
+
+#### Register Webhook
+
+Register a webhook endpoint for a team.
+
+```typescript
+const registration = await client.registerWebhook({
+  teamid: "teamid",
+  url: "https://example.com/anydb-webhook",
+  name: "My AnyDB Webhook",
+  description: "Notify on record changes",
+  // Optional:
+  // timeout: 30000,
+  // maxRetries: 3,
+  // backoffMs: 1000,
+  // customHeaders: { Authorization: "Bearer token" },
+});
+
+console.log(registration.webhook.webhookId);
+console.log(registration.secret); // one-time secret (returned only on register)
+```
+
+#### Update Webhook
+
+Update webhook metadata or URL.
+
+```typescript
+await client.updateWebhook({
+  webhookId: "webhookId",
+  name: "Updated Name",
+  url: "https://example.com/new-webhook-url",
+  timeout: 45000,
+  customHeaders: {
+    Authorization: "Bearer token",
+  },
+});
+```
+
+#### Delete Webhook
+
+Delete a webhook by id.
+
+```typescript
+await client.deleteWebhook("webhookId");
+```
+
+#### Subscribe Webhook
+
+Subscribe a webhook to record events.
+
+```typescript
+await client.subscribeWebhook({
+  webhookId: "webhookId",
+  event: "RECORD_CREATE", // RECORD_CREATE | RECORD_UPDATE | RECORD_DELETE | RECORD_CRAETE
+});
+```
+
+#### Unsubscribe Webhook
+
+Remove a webhook subscription from record events.
+
+```typescript
+await client.unsubscribeWebhook({
+  webhookId: "webhookId",
+  event: "RECORD_CREATE", // RECORD_CREATE | RECORD_UPDATE | RECORD_DELETE | RECORD_CRAETE
 });
 ```
 

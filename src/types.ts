@@ -256,6 +256,93 @@ export interface DeleteShareResponse {
   [key: string]: any;
 }
 
+export type WebhookEventType =
+  | "RECORD_CREATE"
+  | "RECORD_UPDATE"
+  | "RECORD_DELETE";
+
+export type WebhookEventInput = WebhookEventType | "RECORD_CRAETE";
+
+export interface WebhookRetryPolicy {
+  maxRetries: number;
+  backoffMs: number;
+}
+
+export type WebhookStatus = "active" | "disabled" | "suspended";
+
+export interface WebhookDefinition {
+  webhookId: string;
+  teamid: string;
+  registeredBy: string;
+  name: string;
+  description?: string;
+  url: string;
+  customHeaders?: Record<string, string>;
+  status: WebhookStatus;
+  failureCount: number;
+  lastFailureReason?: string;
+  lastFailureAt?: string;
+  lastSuccessAt?: string;
+  totalCalls: number;
+  successfulCalls: number;
+  timeout: number;
+  retryPolicy: WebhookRetryPolicy;
+  created: string;
+  updated?: string;
+}
+
+export interface RegisterWebhookParams {
+  teamid: string;
+  url: string;
+  name: string;
+  description?: string;
+  timeout?: number;
+  maxRetries?: number;
+  backoffMs?: number;
+  customHeaders?: Record<string, string>;
+}
+
+export interface RegisterWebhookResponse {
+  webhook: WebhookDefinition;
+  secret: string;
+}
+
+export interface UpdateWebhookParams {
+  webhookId: string;
+  name?: string;
+  description?: string;
+  url?: string;
+  timeout?: number;
+  customHeaders?: Record<string, string>;
+}
+
+export interface UpdateWebhookResponse {
+  webhook: WebhookDefinition;
+}
+
+export interface DeleteWebhookResponse {
+  success: boolean;
+}
+
+export interface SubscribeWebhookParams {
+  webhookId: string;
+  event: WebhookEventInput;
+}
+
+export interface SubscribeWebhookResponse {
+  webhookId: string;
+  teamid: string;
+  event: WebhookEventType;
+  subscribed: true;
+}
+
+export interface UnsubscribeWebhookResponse {
+  webhookId: string;
+  teamid: string;
+  event: WebhookEventType;
+  unsubscribed: true;
+}
+
 export interface AnyDBClientConfig {
   apiKey: string;
   userEmail: string;
