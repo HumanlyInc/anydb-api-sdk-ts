@@ -20,6 +20,8 @@ export type {
   GetUploadUrlParams,
   GetUploadUrlResponse,
   CompleteUploadParams,
+  UploadFileContent,
+  UploadFileParams,
   CreatePublicShareLinkParams,
   PublicShareLinkResponse,
   CreatePrivateShareLinkParams,

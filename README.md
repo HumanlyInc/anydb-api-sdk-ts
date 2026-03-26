@@ -85,6 +85,9 @@ const client = new AnyDBClient({
   userEmail: string;     // Required: User email for authentication
   baseURL?: string;      // Optional: API base URL (default: https://app.anydb.com/api)
   timeout?: number;      // Optional: Request timeout in ms (default: 30000)
+  debug?: boolean;       // Optional: Force debug logs on/off (defaults to DEBUG_ANYDB env in Node)
+  runtime?: "auto" | "node" | "browser"; // Optional runtime hint (default: "auto")
+  uploadTransport?: "auto" | "axios" | "fetch"; // Optional upload transport (default: "auto")
 });
 ```
 
@@ -396,13 +399,26 @@ Upload a file in one call (handles all steps automatically including creating a 
 // Upload from file content
 const fileAdoid = await client.uploadFile({
   filename: "document.pdf",
-  fileContent: fileBuffer, // Buffer or string
+  fileContent: fileBuffer, // string | Uint8Array | ArrayBuffer
   teamid: "teamid",
   adbid: "adbid",
   adoid: "parentAdoid", // Parent record to attach file to
   cellpos: "A1", // Optional, defaults to "A1"
   contentType: "application/pdf", // Optional
 });
+
+// Browser example (File input)
+const file = input.files?.[0];
+if (file) {
+  const fileAdoid = await client.uploadFile({
+    filename: file.name,
+    fileContent: await file.arrayBuffer(),
+    teamid: "teamid",
+    adbid: "adbid",
+    adoid: "parentAdoid",
+    contentType: file.type,
+  });
+}
 
 // Upload from file path
 const fileAdoid = await client.uploadFile({
@@ -417,6 +433,18 @@ const fileAdoid = await client.uploadFile({
 // Returns: string (ADOID of the created file record)
 console.log("File uploaded with ID:", fileAdoid);
 ```
+
+#### Browser Upload Example
+
+See [examples/browser-upload-example.ts](examples/browser-upload-example.ts) for a complete browser flow using:
+
+- `runtime: "browser"`
+- `uploadTransport: "fetch"`
+- `fileContent: await file.arrayBuffer()`
+
+This is the recommended browser path. `filepath` uploads are Node-only.
+
+For a runnable browser app, see [examples/browser-demo/README.md](examples/browser-demo/README.md).
 
 #### Remove Record
 
@@ -484,10 +512,20 @@ Learn more about AnyDB concepts in the [official documentation](https://www.anyd
 
 ## Debug Mode
 
-Enable debug logging by setting the environment variable:
+Enable debug logging in Node via environment variable:
 
 ```bash
 DEBUG_ANYDB=1 node your-script.js
+```
+
+Or explicitly via client config in any runtime:
+
+```typescript
+const client = new AnyDBClient({
+  apiKey: "your-api-key",
+  userEmail: "user@example.com",
+  debug: true,
+});
 ```
 
 This will log all API requests and responses to the console.

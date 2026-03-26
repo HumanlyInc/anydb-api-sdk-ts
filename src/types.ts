@@ -216,6 +216,19 @@ export interface CompleteUploadParams {
   cellpos?: string;
 }
 
+export type UploadFileContent = string | ArrayBuffer | Uint8Array;
+
+export interface UploadFileParams {
+  filename: string;
+  filepath?: string;
+  fileContent?: UploadFileContent;
+  teamid: string;
+  adbid: string;
+  adoid: string;
+  cellpos?: string;
+  contentType?: string;
+}
+
 export interface CreatePublicShareLinkParams {
   teamid: string;
   adbid: string;
@@ -348,4 +361,7 @@ export interface AnyDBClientConfig {
   userEmail: string;
   baseURL?: string;
   timeout?: number;
+  debug?: boolean;
+  runtime?: "auto" | "node" | "browser";
+  uploadTransport?: "auto" | "axios" | "fetch";
 }

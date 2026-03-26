@@ -4,7 +4,6 @@
  */
 
 import axios, { AxiosInstance } from "axios";
-import { promises as fs } from "fs";
 import type {
   ADORecord,
   Team,
@@ -20,6 +19,8 @@ import type {
   DownloadFileResponse,
   GetUploadUrlParams,
   CompleteUploadParams,
+  UploadFileContent,
+  UploadFileParams,
   CreatePublicShareLinkParams,
   PublicShareLinkResponse,
   CreatePrivateShareLinkParams,
@@ -42,10 +43,21 @@ export class AnyDBClient {
   private client: AxiosInstance;
   private apiKey: string;
   private userEmail: string;
+  private debugEnabled: boolean;
+  private runtime: "auto" | "node" | "browser";
+  private uploadTransport: "auto" | "axios" | "fetch";
 
   constructor(config: AnyDBClientConfig) {
     this.apiKey = config.apiKey;
     this.userEmail = config.userEmail;
+    this.runtime = config.runtime || "auto";
+    this.uploadTransport = config.uploadTransport || "auto";
+    this.debugEnabled =
+      typeof config.debug === "boolean"
+        ? config.debug
+        : typeof process !== "undefined" &&
+          typeof process.env !== "undefined" &&
+          Boolean(process.env.DEBUG_ANYDB);
 
     this.client = axios.create({
       baseURL: config.baseURL || "https://app.anydb.com/api",
@@ -65,7 +77,7 @@ export class AnyDBClient {
               this.apiKey.length - 4,
             )}`
           : "none";
-        if (process.env.DEBUG_ANYDB) {
+        if (this.debugEnabled) {
           console.log(
             `[AnyDB Request] ${config.method?.toUpperCase()} ${config.baseURL}${
               config.url
@@ -84,7 +96,7 @@ export class AnyDBClient {
     // Add response interceptor for logging (optional, can be disabled)
     this.client.interceptors.response.use(
       (response) => {
-        if (process.env.DEBUG_ANYDB) {
+        if (this.debugEnabled) {
           console.log(
             `[AnyDB Response] Status: ${response.status} ${response.message}`,
           );
@@ -93,7 +105,7 @@ export class AnyDBClient {
       },
       (error) => {
         if (error.response) {
-          if (process.env.DEBUG_ANYDB) {
+          if (this.debugEnabled) {
             console.log(
               `[AnyDB Response Error] Status: ${error.response.status}`,
             );
@@ -115,6 +127,70 @@ export class AnyDBClient {
         }
       },
     );
+  }
+
+  private isNodeRuntime(): boolean {
+    if (this.runtime === "node") {
+      return true;
+    }
+    if (this.runtime === "browser") {
+      return false;
+    }
+    return (
+      !("window" in globalThis) &&
+      typeof process !== "undefined" &&
+      typeof process.versions !== "undefined" &&
+      Boolean(process.versions.node)
+    );
+  }
+
+  private resolveUploadTransport(): "axios" | "fetch" {
+    if (this.uploadTransport === "axios" || this.uploadTransport === "fetch") {
+      return this.uploadTransport;
+    }
+    if (
+      !this.isNodeRuntime() &&
+      typeof (globalThis as any).fetch === "function"
+    ) {
+      return "fetch";
+    }
+    return "axios";
+  }
+
+  private getUploadContentLength(content: UploadFileContent): number {
+    if (typeof content === "string") {
+      return new TextEncoder().encode(content).length;
+    }
+    if (content instanceof ArrayBuffer) {
+      return content.byteLength;
+    }
+    return content.byteLength;
+  }
+
+  private normalizeUploadBody(content: UploadFileContent): UploadFileContent {
+    if (content instanceof ArrayBuffer) {
+      return new Uint8Array(content);
+    }
+    return content;
+  }
+
+  private async readFileFromPath(filepath: string): Promise<Uint8Array> {
+    if (!this.isNodeRuntime()) {
+      throw new Error(
+        "`filepath` uploads are only supported in Node runtime. In browsers, provide `fileContent` (e.g., await file.arrayBuffer()).",
+      );
+    }
+
+    try {
+      const fs = await import("fs");
+      return await fs.promises.readFile(filepath);
+    } catch (error) {
+      throw new Error(
+        `Failed to read file from path "${filepath}": ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   // ============================================================================
@@ -611,7 +687,6 @@ export class AnyDBClient {
       maxRedirects: 0, // Don't follow redirects automatically
       validateStatus: (status) => status >= 200 && status < 400, // Accept 302
     });
-    console.log(response.data);
 
     // If it's a redirect response, return the Location header
     if (response.status === 302 && response.headers.location) {
@@ -652,10 +727,37 @@ export class AnyDBClient {
    */
   async uploadFileToUrl(
     uploadUrl: string,
-    fileContent: Buffer | string,
+    fileContent: UploadFileContent,
     contentType?: string,
   ): Promise<void> {
-    await axios.put(uploadUrl, fileContent, {
+    const body = this.normalizeUploadBody(fileContent);
+    const transport = this.resolveUploadTransport();
+
+    if (transport === "fetch") {
+      const fetchFn = (globalThis as any).fetch;
+      if (typeof fetchFn !== "function") {
+        throw new Error(
+          'Fetch upload transport is not available in this runtime. Use `uploadTransport: "axios"`.',
+        );
+      }
+
+      const response = await fetchFn(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": contentType || "application/octet-stream",
+        },
+        body: body as any,
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to upload file content to URL: ${response.status} ${response.statusText}`,
+        );
+      }
+      return;
+    }
+
+    await axios.put(uploadUrl, body, {
       headers: {
         "Content-Type": contentType || "application/octet-stream",
       },
@@ -702,16 +804,7 @@ export class AnyDBClient {
    * @param params.contentType - MIME type (optional)
    * @returns Promise resolving to adoid of the created file record
    */
-  async uploadFile(params: {
-    filename: string;
-    filepath?: string;
-    fileContent?: Buffer | string;
-    teamid: string;
-    adbid: string;
-    adoid: string;
-    cellpos?: string;
-    contentType?: string;
-  }): Promise<string> {
+  async uploadFile(params: UploadFileParams): Promise<string> {
     const {
       filename,
       filepath,
@@ -734,25 +827,14 @@ export class AnyDBClient {
     }
 
     // Read file content if filepath is provided
-    let file: Buffer;
+    let file: UploadFileContent;
     if (filepath) {
-      try {
-        file = await fs.readFile(filepath);
-      } catch (error) {
-        throw new Error(
-          `Failed to read file from path "${filepath}": ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
+      file = await this.readFileFromPath(filepath);
     } else {
-      // Convert fileContent to Buffer if it's a string
-      file = Buffer.isBuffer(fileContent)
-        ? fileContent
-        : Buffer.from(fileContent!);
+      file = fileContent!;
     }
 
-    const filesize = file.length.toString();
+    const filesize = this.getUploadContentLength(file).toString();
 
     // Step 1: Create a new record as a child of the provided adoid using FILE_TEMPLATE
     const fileRecord = await this.createRecord({
