@@ -3,7 +3,7 @@
  * TypeScript client for interacting with AnyDB API
  */
 
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 import type {
   ADORecord,
   Team,
@@ -98,7 +98,7 @@ export class AnyDBClient {
       (response) => {
         if (this.debugEnabled) {
           console.log(
-            `[AnyDB Response] Status: ${response.status} ${response.message}`,
+            `[AnyDB Response] Status: ${response.status} ${response.statusText}`,
           );
         }
         return response;
@@ -117,8 +117,14 @@ export class AnyDBClient {
             error.response.data?.message ||
             error.response.data?.error ||
             error.response.statusText;
-          throw new Error(
-            `AnyDB API Error (${error.response.status}): ${errorMsg}`,
+          throw Object.assign(
+            new Error(
+              `AnyDB API Error (${error.response.status}): ${errorMsg}`,
+            ),
+            {
+              status: error.response.status,
+              data: error.response.data,
+            },
           );
         } else if (error.request) {
           throw new Error("AnyDB API Error: No response received from server");
@@ -167,6 +173,16 @@ export class AnyDBClient {
     return content.byteLength;
   }
 
+  private getResponseMessage(response: AxiosResponse): string {
+    return (
+      response.data?.message ||
+      response.data?.error ||
+      response.statusText ||
+      JSON.stringify(response.data) ||
+      "Unknown error"
+    );
+  }
+
   private normalizeUploadBody(content: UploadFileContent): UploadFileContent {
     if (content instanceof ArrayBuffer) {
       return new Uint8Array(content);
@@ -211,7 +227,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to get record ${adoid}: ${response.message}`);
+    throw new Error(
+      `Failed to get record ${adoid}: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -223,7 +241,7 @@ export class AnyDBClient {
     if (response.status === 200 && response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to list teams: ${response.message}`);
+    throw new Error(`Failed to list teams: ${this.getResponseMessage(response)}`);
   }
 
   /**
@@ -238,7 +256,9 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to list databases for team ${teamid}: ${response.message}`,
+      `Failed to list databases for team ${teamid}: ${this.getResponseMessage(
+        response,
+      )}`,
     );
   }
 
@@ -276,16 +296,20 @@ export class AnyDBClient {
 
     //console.log(response.data);
     if (response.data.status === "success") {
+      const data = response.data.data;
+
       // Return full response with pagination metadata
       return {
-        items: response.data.data.items || response.data.data,
-        lastmarker: response.data.data.lastmarker,
-        hasmore: response.data.data.hasmore,
-        total: response.data.data.total,
+        items: data.items || data,
+        lastmarker: data.lastmarker || data.lastMarker || data.nextCursor,
+        hasmore: data.hasmore ?? data.hasMore,
+        total: data.total,
       };
     }
     throw new Error(
-      `Failed to list records for database ${adbid}: ${response.message}`,
+      `Failed to list records for database ${adbid}: ${this.getResponseMessage(
+        response,
+      )}`,
     );
   }
 
@@ -301,7 +325,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to create record: ${response.message}`);
+    throw new Error(
+      `Failed to create record: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -315,7 +341,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to update record: ${response.message}`);
+    throw new Error(
+      `Failed to update record: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -332,7 +360,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return true;
     }
-    throw new Error(`Failed to remove record: ${response.message}`);
+    throw new Error(
+      `Failed to remove record: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -365,7 +395,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to copy record: ${response.message}`);
+    throw new Error(
+      `Failed to copy record: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -397,7 +429,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to search records: ${response.message}`);
+    throw new Error(
+      `Failed to search records: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -468,7 +502,9 @@ export class AnyDBClient {
         url: `${serverBaseUrl}/s/${shareToken}`,
       };
     }
-    throw new Error(`Failed to create public share link: ${response.message}`);
+    throw new Error(
+      `Failed to create public share link: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -537,7 +573,11 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to create private share link: ${response.message}`);
+    throw new Error(
+      `Failed to create private share link: ${this.getResponseMessage(
+        response,
+      )}`,
+    );
   }
 
   /**
@@ -559,7 +599,9 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to delete share ${params.shareid}: ${response.message}`,
+      `Failed to delete share ${params.shareid}: ${this.getResponseMessage(
+        response,
+      )}`,
     );
   }
 
@@ -582,7 +624,9 @@ export class AnyDBClient {
     if (response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to register webhook: ${response.message}`);
+    throw new Error(
+      `Failed to register webhook: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
@@ -601,7 +645,9 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to update webhook ${webhookId}: ${response.message}`,
+      `Failed to update webhook ${webhookId}: ${this.getResponseMessage(
+        response,
+      )}`,
     );
   }
 
@@ -615,7 +661,9 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to delete webhook ${webhookId}: ${response.message}`,
+      `Failed to delete webhook ${webhookId}: ${this.getResponseMessage(
+        response,
+      )}`,
     );
   }
 
@@ -634,7 +682,9 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to subscribe webhook ${params.webhookId}: ${response.message}`,
+      `Failed to subscribe webhook ${
+        params.webhookId
+      }: ${this.getResponseMessage(response)}`,
     );
   }
 
@@ -652,7 +702,9 @@ export class AnyDBClient {
       return response.data.data;
     }
     throw new Error(
-      `Failed to unsubscribe webhook ${params.webhookId}: ${response.message}`,
+      `Failed to unsubscribe webhook ${
+        params.webhookId
+      }: ${this.getResponseMessage(response)}`,
     );
   }
 
@@ -716,7 +768,9 @@ export class AnyDBClient {
       },
     });
     if (response.data.status !== "success") {
-      throw new Error(`Failed to get upload URL: ${response.message}`);
+      throw new Error(
+        `Failed to get upload URL: ${this.getResponseMessage(response)}`,
+      );
     }
     return response.data.data.url;
   }
@@ -779,7 +833,9 @@ export class AnyDBClient {
       cellpos: params.cellpos,
     });
     if (response.data.status !== "success") {
-      throw new Error(`Failed to complete upload: ${response.message}`);
+      throw new Error(
+        `Failed to complete upload: ${this.getResponseMessage(response)}`,
+      );
     }
     return true;
   }

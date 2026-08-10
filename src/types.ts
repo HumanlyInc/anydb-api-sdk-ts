@@ -45,6 +45,19 @@ export enum ADOCellFormat {
   SELECT = "select",
   RICH_TEXT = "rich-text",
   ATTACHMENTS = "attachments",
+  COMMENTS = "comments",
+  AI = "ai",
+  BARCODE = "barcode",
+  QRCODE = "qrcode",
+  CHART = "chart",
+  REPORT = "report",
+  LOOKUP = "lookup",
+  BUTTON = "button",
+  TIMELINE = "timeline",
+  USERS = "users",
+  DYNAMIC = "dynamic",
+  HEADING = "heading",
+  MULTI_SELECT = "multi-select",
 }
 
 // Cell structure in record content
@@ -59,6 +72,8 @@ export interface ADOCell {
   props?: Record<string, any>;
   expr?: string;
   msg?: string | null;
+  display?: string;
+  comments?: Record<string, any>;
 }
 
 // Partial cell for updates (only requires pos and value at minimum)
@@ -73,6 +88,8 @@ export interface ADOCellUpdate {
   props?: Record<string, any>;
   expr?: string;
   msg?: string | null;
+  display?: string;
+  comments?: Record<string, any>;
 }
 
 // Content is a map of cell positions to cell data
