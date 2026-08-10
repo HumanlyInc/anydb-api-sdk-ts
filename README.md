@@ -179,6 +179,41 @@ const newRecord = await client.createRecord({
 // Returns: ADORecord
 ```
 
+#### Create a Child Record
+
+Create a record as a child of an existing parent record by setting `attach` to
+the parent's ADOID. When listing the parent's children, pass that same ADOID as
+the `parentid` argument to `listRecords`.
+
+```typescript
+const parentRecord = await client.createRecord({
+  teamid: "teamid",
+  adbid: "adbid",
+  name: "Parent Record",
+});
+
+const childRecord = await client.createRecord({
+  teamid: "teamid",
+  adbid: "adbid",
+  name: "Child Record",
+  attach: parentRecord.meta.adoid,
+  content: {
+    A1: {
+      pos: "A1",
+      key: "Name",
+      type: ADOCellValueType.STRING,
+      value: "Child Record",
+    },
+  },
+});
+
+const children = await client.listRecords(
+  "teamid",
+  "adbid",
+  parentRecord.meta.adoid, // parentid
+);
+```
+
 #### Update Record
 
 Update an existing record.
@@ -193,11 +228,85 @@ const updatedRecord = await client.updateRecord({
     description: "New description",
   },
   content: {
-    A1: { value: "Updated value" },
+    A1: { pos: "A1", value: "Updated value" },
   },
 });
 // Returns: ADORecord
 ```
+
+#### Create Reference and Lookup Cells
+
+A reference cell links one record to another using the target record's ADOID.
+A lookup cell can then follow that reference and read a labeled value from the
+linked record.
+
+```typescript
+import { ADOCellFormat, ADOCellValueType } from "anydb-api-sdk-ts";
+
+const personRecordAdoid = "person-record-adoid";
+
+// E5 links this new sheet to the Person record.
+const referenceSheet = await client.createRecord({
+  teamid: "teamid",
+  adbid: "adbid",
+  name: "Person Reference Sheet",
+  content: {
+    E5: {
+      pos: "E5",
+      type: ADOCellValueType.REF,
+      format: ADOCellFormat.REF,
+      colspan: 1,
+      rowspan: 1,
+      props: {
+        ATTACHMENTS_TEMPLATE_NAME: {
+          type: "string",
+          value: "Sheet",
+          expr: "",
+          proptype: "CELL",
+        },
+      },
+      key: "My Reference",
+      value: "",
+      expr: `O@${personRecordAdoid}!F@GO!M@MINI`,
+      msg: "",
+      display: "",
+      comments: { comments: [] },
+    },
+  },
+});
+
+// F5 follows the reference in E5 and reads the linked Person's "Age" value.
+await client.updateRecord({
+  meta: {
+    adoid: referenceSheet.meta.adoid,
+    adbid: "adbid",
+    teamid: "teamid",
+  },
+  content: {
+    F5: {
+      pos: "F5",
+      type: ADOCellValueType.STRING,
+      format: ADOCellFormat.LOOKUP,
+      colspan: 1,
+      rowspan: 1,
+      props: {},
+      key: "F5",
+      value: "",
+      expr: 'DYNREF(E5,{{Age}},"GO")',
+      msg: "",
+      display: "",
+      comments: { comments: [] },
+    },
+  },
+});
+```
+
+`DYNREF` takes the reference cell coordinate as its first argument and the
+linked object's cell label in double braces as its second argument. In this
+example, it follows `E5` and reads the cell labeled `Age`.
+
+See [`examples/record-content-example.ts`](examples/record-content-example.ts)
+for the complete runnable sequence.
 
 #### Search Records
 
