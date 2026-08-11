@@ -97,9 +97,7 @@ export class AnyDBClient {
     this.client.interceptors.response.use(
       (response) => {
         if (this.debugEnabled) {
-          console.log(
-            `[AnyDB Response] Status: ${response.status} ${response.statusText}`,
-          );
+          console.log(`[AnyDB Response] Status: ${response.status}`);
         }
         return response;
       },
@@ -116,7 +114,7 @@ export class AnyDBClient {
           const errorMsg =
             error.response.data?.message ||
             error.response.data?.error ||
-            error.response.statusText;
+            `HTTP ${error.response.status}`;
           throw Object.assign(
             new Error(
               `AnyDB API Error (${error.response.status}): ${errorMsg}`,
@@ -177,9 +175,8 @@ export class AnyDBClient {
     return (
       response.data?.message ||
       response.data?.error ||
-      response.statusText ||
       JSON.stringify(response.data) ||
-      "Unknown error"
+      `HTTP ${response.status}`
     );
   }
 
@@ -241,7 +238,9 @@ export class AnyDBClient {
     if (response.status === 200 && response.data.status === "success") {
       return response.data.data;
     }
-    throw new Error(`Failed to list teams: ${this.getResponseMessage(response)}`);
+    throw new Error(
+      `Failed to list teams: ${this.getResponseMessage(response)}`,
+    );
   }
 
   /**
