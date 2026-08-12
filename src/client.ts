@@ -35,6 +35,43 @@ import type {
   SubscribeWebhookParams,
   SubscribeWebhookResponse,
   UnsubscribeWebhookResponse,
+  CreateWorkspaceParams,
+  CreateWorkspaceResponse,
+  WorkspaceResourceParams,
+  WorkflowSummary,
+  WorkflowDetails,
+  GetWorkflowParams,
+  WorkflowArtifactCatalogEntry,
+  CreateWorkflowParams,
+  CreateWorkflowResponse,
+  UpdateWorkflowParams,
+  UpdateWorkflowResponse,
+  CreateViewParams,
+  CreateViewResponse,
+  UpdateViewParams,
+  UpdateViewResponse,
+  ViewDefinition,
+  GetViewParams,
+  DeleteViewParams,
+  DeleteViewResponse,
+  DiscoverTypesParams,
+  DiscoverTypesResponse,
+  GetTypeParams,
+  GetTypeDefinitionParams,
+  TypeDefinitionResponse,
+  AnyDBType,
+  TypeSummary,
+  CreateTypeParams,
+  CreateTypeResponse,
+  UpdateTypeParams,
+  UpdateTypeResponse,
+  TeamGroup,
+  CreateShareParams,
+  CreateShareResponse,
+  ShareDefinition,
+  GetShareParams,
+  RevokeShareParams,
+  RevokeShareResponse,
   AnyDBClientConfig,
 } from "./types.js";
 import { PredefinedTemplateAdoIds, PUBLIC_USER_ID } from "./types.js";
@@ -111,9 +148,12 @@ export class AnyDBClient {
               `[AnyDB Response Error] Data: ${JSON.stringify(error.response.data)}`,
             );
           }
+          const responseError = error.response.data?.error;
           const errorMsg =
             error.response.data?.message ||
-            error.response.data?.error ||
+            (typeof responseError === "string"
+              ? responseError
+              : responseError?.message) ||
             `HTTP ${error.response.status}`;
           throw Object.assign(
             new Error(
@@ -178,6 +218,16 @@ export class AnyDBClient {
       JSON.stringify(response.data) ||
       `HTTP ${response.status}`
     );
+  }
+
+  private unwrapResponse<T>(
+    response: AxiosResponse,
+    failureMessage: string,
+  ): T {
+    if (response.data.status === "success") {
+      return response.data.data as T;
+    }
+    throw new Error(`${failureMessage}: ${this.getResponseMessage(response)}`);
   }
 
   private normalizeUploadBody(content: UploadFileContent): UploadFileContent {
@@ -259,6 +309,206 @@ export class AnyDBClient {
         response,
       )}`,
     );
+  }
+
+  // ============================================================================
+  // Workspace, Type, and View Operations
+  // ============================================================================
+
+  async createWorkspace(
+    params: CreateWorkspaceParams,
+  ): Promise<CreateWorkspaceResponse> {
+    const response = await this.client.post(
+      "/integrations/ext/workspaces",
+      params,
+    );
+    return this.unwrapResponse(response, "Failed to create workspace");
+  }
+
+  // ============================================================================
+  // Workflow Operations
+  // ============================================================================
+
+  async listWorkflows(
+    params: WorkspaceResourceParams,
+  ): Promise<WorkflowSummary[]> {
+    const response = await this.client.get("/integrations/ext/workflows", {
+      params,
+    });
+    return this.unwrapResponse(response, "Failed to list workflows");
+  }
+
+  async getWorkflow(params: GetWorkflowParams): Promise<WorkflowDetails> {
+    const { workflowId, ...queryParams } = params;
+    const response = await this.client.get(
+      `/integrations/ext/workflows/${encodeURIComponent(workflowId)}`,
+      { params: queryParams },
+    );
+    return this.unwrapResponse(
+      response,
+      `Failed to get workflow ${workflowId}`,
+    );
+  }
+
+  async getWorkflowExecutionHistory(
+    params: GetWorkflowParams,
+  ): Promise<unknown[]> {
+    const { workflowId, ...queryParams } = params;
+    const response = await this.client.get(
+      `/integrations/ext/workflows/${encodeURIComponent(workflowId)}/execution-history`,
+      { params: queryParams },
+    );
+    return this.unwrapResponse(
+      response,
+      `Failed to get execution history for workflow ${workflowId}`,
+    );
+  }
+
+  async listWorkflowTriggers(
+    params: WorkspaceResourceParams,
+  ): Promise<WorkflowArtifactCatalogEntry[]> {
+    const response = await this.client.get(
+      "/integrations/ext/workflow-triggers",
+      { params },
+    );
+    return this.unwrapResponse(response, "Failed to list workflow triggers");
+  }
+
+  async listWorkflowActions(
+    params: WorkspaceResourceParams,
+  ): Promise<WorkflowArtifactCatalogEntry[]> {
+    const response = await this.client.get(
+      "/integrations/ext/workflow-actions",
+      { params },
+    );
+    return this.unwrapResponse(response, "Failed to list workflow actions");
+  }
+
+  async createWorkflow(
+    params: CreateWorkflowParams,
+  ): Promise<CreateWorkflowResponse> {
+    const response = await this.client.post(
+      "/integrations/ext/workflows",
+      params,
+    );
+    return this.unwrapResponse(response, "Failed to create workflow");
+  }
+
+  async updateWorkflow(
+    params: UpdateWorkflowParams,
+  ): Promise<UpdateWorkflowResponse> {
+    const { workflowId, ...requestBody } = params;
+    const response = await this.client.put(
+      `/integrations/ext/workflows/${encodeURIComponent(workflowId)}`,
+      requestBody,
+    );
+    return this.unwrapResponse(
+      response,
+      `Failed to update workflow ${workflowId}`,
+    );
+  }
+
+  async listTypes(params: WorkspaceResourceParams): Promise<TypeSummary[]> {
+    const response = await this.client.get("/integrations/ext/templates", {
+      params,
+    });
+    return this.unwrapResponse(response, "Failed to list types");
+  }
+
+  async discoverTypes(
+    params: DiscoverTypesParams,
+  ): Promise<DiscoverTypesResponse> {
+    const response = await this.client.get(
+      "/integrations/ext/templates/discover",
+      { params },
+    );
+    return this.unwrapResponse(response, "Failed to discover types");
+  }
+
+  async getTypeDefinition(
+    params: GetTypeDefinitionParams,
+  ): Promise<TypeDefinitionResponse> {
+    const { typeName, ...queryParams } = params;
+    const response = await this.client.get(
+      `/integrations/ext/templates/${encodeURIComponent(typeName)}/definition`,
+      { params: queryParams },
+    );
+    return this.unwrapResponse(
+      response,
+      `Failed to get definition for type ${typeName}`,
+    );
+  }
+
+  async createType(params: CreateTypeParams): Promise<CreateTypeResponse> {
+    const response = await this.client.post(
+      "/integrations/ext/templates",
+      params,
+    );
+    return this.unwrapResponse(response, "Failed to create type");
+  }
+
+  async updateType(params: UpdateTypeParams): Promise<UpdateTypeResponse> {
+    const { typeName, ...requestBody } = params;
+    const response = await this.client.put(
+      `/integrations/ext/templates/${encodeURIComponent(typeName)}`,
+      requestBody,
+    );
+    return this.unwrapResponse(response, `Failed to update type ${typeName}`);
+  }
+
+  async getType(params: GetTypeParams): Promise<AnyDBType> {
+    const { typeName, ...queryParams } = params;
+    const response = await this.client.get(
+      `/integrations/ext/templates/${encodeURIComponent(typeName)}`,
+      { params: queryParams },
+    );
+    return this.unwrapResponse(response, `Failed to get type ${typeName}`);
+  }
+
+  async createView(params: CreateViewParams): Promise<CreateViewResponse> {
+    const response = await this.client.post("/integrations/ext/views", params);
+    return this.unwrapResponse(response, "Failed to create view");
+  }
+
+  async updateView(params: UpdateViewParams): Promise<UpdateViewResponse> {
+    const { viewId, ...requestBody } = params;
+    const response = await this.client.put(
+      `/integrations/ext/views/${encodeURIComponent(viewId)}`,
+      requestBody,
+    );
+    return this.unwrapResponse(response, `Failed to update view ${viewId}`);
+  }
+
+  async listViews(params: WorkspaceResourceParams): Promise<ViewDefinition[]> {
+    const response = await this.client.get("/integrations/ext/views", {
+      params,
+    });
+    return this.unwrapResponse(response, "Failed to list views");
+  }
+
+  async getView(params: GetViewParams): Promise<ViewDefinition> {
+    const { viewId, ...queryParams } = params;
+    const response = await this.client.get(
+      `/integrations/ext/views/${encodeURIComponent(viewId)}`,
+      { params: queryParams },
+    );
+    return this.unwrapResponse(response, `Failed to get view ${viewId}`);
+  }
+
+  async deleteView(params: DeleteViewParams): Promise<DeleteViewResponse> {
+    const { viewId, ...requestBody } = params;
+    const response = await this.client.delete(
+      `/integrations/ext/views/${encodeURIComponent(viewId)}`,
+      { data: requestBody },
+    );
+    return this.unwrapResponse(response, `Failed to delete view ${viewId}`);
+  }
+
+  async listTeamGroups(teamid: string): Promise<TeamGroup[]> {
+    const response = await this.client.get("/integrations/ext/team-groups", {
+      params: { teamid },
+    });
+    return this.unwrapResponse(response, "Failed to list team groups");
   }
 
   /**
@@ -431,6 +681,62 @@ export class AnyDBClient {
     throw new Error(
       `Failed to search records: ${this.getResponseMessage(response)}`,
     );
+  }
+
+  // ============================================================================
+  // Semantic Share Operations
+  // ============================================================================
+
+  async createShare(params: CreateShareParams): Promise<CreateShareResponse> {
+    const target = params.share.target;
+    const requestBody =
+      target.kind === "form"
+        ? {
+            ...params,
+            share: {
+              ...params.share,
+              target: {
+                kind: "form",
+                templateName: target.typeName,
+                ...(target.parentRecordId
+                  ? { parentRecordId: target.parentRecordId }
+                  : {}),
+              },
+            },
+          }
+        : params;
+    const response = await this.client.post(
+      "/integrations/ext/shares",
+      requestBody,
+    );
+    return this.unwrapResponse(response, "Failed to create share");
+  }
+
+  async listShares(
+    params: WorkspaceResourceParams,
+  ): Promise<ShareDefinition[]> {
+    const response = await this.client.get("/integrations/ext/shares", {
+      params,
+    });
+    return this.unwrapResponse(response, "Failed to list shares");
+  }
+
+  async getShare(params: GetShareParams): Promise<ShareDefinition> {
+    const { shareId, ...queryParams } = params;
+    const response = await this.client.get(
+      `/integrations/ext/shares/${encodeURIComponent(shareId)}`,
+      { params: queryParams },
+    );
+    return this.unwrapResponse(response, `Failed to get share ${shareId}`);
+  }
+
+  async revokeShare(params: RevokeShareParams): Promise<RevokeShareResponse> {
+    const { shareId, ...requestBody } = params;
+    const response = await this.client.delete(
+      `/integrations/ext/shares/${encodeURIComponent(shareId)}`,
+      { data: requestBody },
+    );
+    return this.unwrapResponse(response, `Failed to revoke share ${shareId}`);
   }
 
   /**

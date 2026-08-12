@@ -111,6 +111,140 @@ const databases = await client.listDatabasesForTeam("teamid");
 // Returns: ADB[]
 ```
 
+#### Create Workspace
+
+```typescript
+const workspace = await client.createWorkspace({
+  teamid: "teamid",
+  name: "Operations",
+  clientRequestId: crypto.randomUUID(),
+});
+```
+
+### Type Operations
+
+The SDK uses **type** terminology while the underlying API routes use templates.
+
+```typescript
+const scope = { teamid: "teamid", adbid: "adbid" };
+
+const types = await client.listTypes(scope);
+const matches = await client.discoverTypes({
+  ...scope,
+  search: "project",
+  source: "all",
+  limit: 20,
+});
+const type = await client.getType({ ...scope, typeName: "Project" });
+const definition = await client.getTypeDefinition({
+  ...scope,
+  typeName: "Project",
+  source: "workspace",
+});
+
+await client.createType({
+  ...scope,
+  clientRequestId: crypto.randomUUID(),
+  mode: "import_builtin",
+  builtInTemplateName: "Project",
+});
+
+await client.updateType({
+  ...scope,
+  typeName: "Project",
+  clientRequestId: crypto.randomUUID(),
+  expectedRevision: "1",
+  changes: { description: "Customer projects" },
+  confirmDataLoss: false,
+});
+```
+
+### View Operations
+
+```typescript
+const scope = { teamid: "teamid", adbid: "adbid" };
+const created = await client.createView({
+  ...scope,
+  clientRequestId: crypto.randomUUID(),
+  view: {
+    name: "Open projects",
+    scope: "workspace",
+    targets: [
+      {
+        typeName: "Project",
+        filters: [
+          { source: "cell", field: "Status", operator: "eq", value: "Open" },
+        ],
+      },
+    ],
+  },
+});
+
+const views = await client.listViews(scope);
+const view = await client.getView({ ...scope, viewId: created.result.viewId! });
+
+await client.updateView({
+  ...scope,
+  viewId: view.viewId,
+  clientRequestId: crypto.randomUUID(),
+  changes: { name: "Active projects" },
+});
+
+await client.deleteView({
+  ...scope,
+  viewId: view.viewId,
+  clientRequestId: crypto.randomUUID(),
+});
+```
+
+### Workflow Operations
+
+Inspect the catalogs before creating a workflow to get the supported trigger
+and action types, configuration schemas, and availability for the current team.
+
+```typescript
+const scope = { teamid: "teamid", adbid: "adbid" };
+const triggers = await client.listWorkflowTriggers(scope);
+const actions = await client.listWorkflowActions(scope);
+const workflows = await client.listWorkflows(scope);
+
+const validation = await client.createWorkflow({
+  ...scope,
+  clientRequestId: crypto.randomUUID(),
+  validateOnly: true,
+  workflow: {
+    name: "Notify on project creation",
+    trigger: {
+      type: "trigger_on_record_create",
+      config: { templateName: "Project" },
+    },
+    actions: [
+      {
+        key: "notify",
+        type: "action_send_email",
+        config: { subject: "New project" },
+      },
+    ],
+  },
+});
+
+const workflow = await client.getWorkflow({
+  ...scope,
+  workflowId: "workflowid",
+});
+const history = await client.getWorkflowExecutionHistory({
+  ...scope,
+  workflowId: workflow.workflowId,
+});
+
+await client.updateWorkflow({
+  ...scope,
+  workflowId: workflow.workflowId,
+  clientRequestId: crypto.randomUUID(),
+  changes: { enabled: false },
+});
+```
+
 #### List Records
 
 List all records in a database with pagination support.
@@ -409,6 +543,44 @@ const shareid = created.shareid || created.id || created._id;
 await client.deleteShare({
   shareid,
   teamid: "teamid",
+});
+```
+
+#### Semantic Shares and Team Groups
+
+Semantic shares support records and forms, private recipients by email or team
+group name, validation-only requests, and share discovery.
+
+```typescript
+const scope = { teamid: "teamid", adbid: "adbid" };
+const groups = await client.listTeamGroups(scope.teamid);
+
+const created = await client.createShare({
+  ...scope,
+  clientRequestId: crypto.randomUUID(),
+  share: {
+    privacy: "private",
+    target: { kind: "record", recordId: "adoid" },
+    recipients: {
+      emails: ["viewer@example.com"],
+      groupNames: groups.length ? [groups[0].name] : [],
+    },
+    role: "viewer",
+  },
+});
+
+const shares = await client.listShares(scope);
+const share = await client.getShare({
+  ...scope,
+  shareId: created.result.shareId!,
+  kind: "record",
+});
+
+await client.revokeShare({
+  ...scope,
+  shareId: share.shareId,
+  kind: share.kind,
+  clientRequestId: crypto.randomUUID(),
 });
 ```
 
