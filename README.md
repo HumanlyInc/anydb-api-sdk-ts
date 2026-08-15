@@ -546,9 +546,9 @@ await client.deleteShare({
 });
 ```
 
-#### Semantic Shares and Team Groups
+#### Shares and Team Groups
 
-Semantic shares support records and forms, private recipients by email or team
+Shares support records and forms, private recipients by email or team
 group name, validation-only requests, and share discovery.
 
 ```typescript
