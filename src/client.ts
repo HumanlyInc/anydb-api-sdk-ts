@@ -74,7 +74,11 @@ import type {
   RevokeShareResponse,
   AnyDBClientConfig,
 } from "./types.js";
-import { PredefinedTemplateAdoIds, PUBLIC_USER_ID } from "./types.js";
+import {
+  NULL_OBJECTID,
+  PredefinedTemplateAdoIds,
+  PUBLIC_USER_ID,
+} from "./types.js";
 
 export class AnyDBClient {
   private client: AxiosInstance;
@@ -162,6 +166,7 @@ export class AnyDBClient {
             {
               status: error.response.status,
               data: error.response.data,
+              retryAfter: error.response.headers?.["retry-after"],
             },
           );
         } else if (error.request) {
@@ -1042,19 +1047,52 @@ export class AnyDBClient {
     const response = await this.client.get("/integrations/ext/download", {
       params: queryParams,
       maxRedirects: 0, // Don't follow redirects automatically
-      validateStatus: (status) => status >= 200 && status < 400, // Accept 302
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 302,
     });
 
-    // If it's a redirect response, return the Location header
-    if (response.status === 302 && response.headers.location) {
+    // If it's a redirect response, return the Location header.
+    if (response.status === 302) {
+      const url = response.headers.location;
+      if (!url) {
+        throw new Error(
+          "Failed to download file: redirect response did not contain a URL",
+        );
+      }
       return {
-        url: response.headers.location,
+        url,
         redirect: true,
       };
     }
 
-    // Otherwise return the URL from response data
-    return response.data;
+    const body = response.data;
+    let url: unknown;
+    let redirect = false;
+
+    // AnyDB API responses normally use { status, data }. Keep accepting the
+    // older direct response shapes so existing API deployments remain usable.
+    if (body?.status !== undefined) {
+      if (body.status !== "success") {
+        throw new Error(
+          `Failed to download file: ${this.getResponseMessage(response)}`,
+        );
+      }
+
+      const payload = body.data;
+      url = typeof payload === "string" ? payload : payload?.url;
+      redirect = Boolean(payload?.redirect);
+    } else {
+      url = typeof body === "string" ? body : body?.url;
+      redirect = Boolean(body?.redirect);
+    }
+
+    if (typeof url !== "string" || url.length === 0) {
+      throw new Error(
+        "Failed to download file: success response did not contain a URL",
+      );
+    }
+
+    return { url, redirect };
   }
 
   /**
@@ -1210,29 +1248,46 @@ export class AnyDBClient {
     // Use the newly created file record's adoid for subsequent operations
     const fileAdoid = fileRecord.meta.adoid;
 
-    // Step 2: Get upload URL for the new file record
-    const url = await this.getUploadUrl({
-      filename,
-      teamid,
-      adbid,
-      adoid: fileAdoid,
-      filesize,
-      cellpos,
-    });
-    //console.log(url);
+    try {
+      // Step 2: Get upload URL for the new file record
+      const url = await this.getUploadUrl({
+        filename,
+        teamid,
+        adbid,
+        adoid: fileAdoid,
+        filesize,
+        cellpos,
+      });
 
-    // Step 3: Upload file using multipart upload to the URL
-    await this.uploadFileToUrl(url, file, contentType);
+      // Step 3: Upload file using multipart upload to the URL
+      await this.uploadFileToUrl(url, file, contentType);
 
-    // Step 4: Complete upload for the new file record
-    await this.completeUpload({
-      filesize,
-      teamid,
-      adbid,
-      adoid: fileAdoid,
-      cellpos,
-    });
+      // Step 4: Complete upload for the new file record
+      await this.completeUpload({
+        filesize,
+        teamid,
+        adbid,
+        adoid: fileAdoid,
+        cellpos,
+      });
 
-    return fileRecord.meta.adoid;
+      return fileAdoid;
+    } catch (uploadError) {
+      try {
+        await this.removeRecord({
+          adoid: fileAdoid,
+          adbid,
+          teamid,
+          removefromids: NULL_OBJECTID,
+        });
+      } catch (cleanupError) {
+        const uploadMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
+        const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        throw new Error(
+          `${uploadMessage}; cleanup of incomplete file record ${fileAdoid} failed: ${cleanupMessage}`,
+        );
+      }
+      throw uploadError;
+    }
   }
 }

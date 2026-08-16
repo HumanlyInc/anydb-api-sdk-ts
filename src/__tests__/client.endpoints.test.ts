@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 import { AnyDBClient } from "../client";
+import { NULL_OBJECTID } from "../types";
 
 jest.mock("axios");
 
@@ -46,6 +47,100 @@ describe("AnyDBClient integration endpoints", () => {
         },
       }),
     ).toThrow("AnyDB API Error (424): Persistence failed");
+  });
+
+  it("exposes retry-after metadata on rate-limit errors", () => {
+    const responseInterceptor =
+      request.interceptors.response.use.mock.calls[0][1];
+    try {
+      responseInterceptor({
+        response: {
+          status: 429,
+          headers: { "retry-after": "30" },
+          data: { status: "error", message: "Too many requests" },
+        },
+      });
+      throw new Error("Expected interceptor to throw");
+    } catch (error) {
+      expect(error).toMatchObject({
+        status: 429,
+        retryAfter: "30",
+      });
+    }
+  });
+
+  describe("downloadFile", () => {
+    const params = {
+      teamid: "team",
+      adbid: "adb",
+      adoid: "file-record",
+      cellpos: "A1",
+      redirect: false,
+    };
+
+    it("unwraps a URL string from the standard API response", async () => {
+      request.get.mockResolvedValue(successResponse("https://files.example/file"));
+
+      await expect(client.downloadFile(params)).resolves.toEqual({
+        url: "https://files.example/file",
+        redirect: false,
+      });
+    });
+
+    it("unwraps a URL object from the standard API response", async () => {
+      request.get.mockResolvedValue(
+        successResponse({ url: "https://files.example/file" }),
+      );
+
+      await expect(client.downloadFile(params)).resolves.toEqual({
+        url: "https://files.example/file",
+        redirect: false,
+      });
+    });
+
+    it("keeps supporting the legacy direct URL response", async () => {
+      request.get.mockResolvedValue({
+        status: 200,
+        data: { url: "https://files.example/file", redirect: true },
+      } as AxiosResponse);
+
+      await expect(client.downloadFile(params)).resolves.toEqual({
+        url: "https://files.example/file",
+        redirect: true,
+      });
+    });
+
+    it("returns the Location header for a redirect response", async () => {
+      request.get.mockResolvedValue({
+        status: 302,
+        headers: { location: "https://files.example/file" },
+        data: undefined,
+      } as AxiosResponse);
+
+      await expect(client.downloadFile({ ...params, redirect: true })).resolves.toEqual({
+        url: "https://files.example/file",
+        redirect: true,
+      });
+    });
+
+    it("throws the API message for an application-level failure", async () => {
+      request.get.mockResolvedValue({
+        status: 200,
+        data: { status: "error", message: "File is not available" },
+      } as AxiosResponse);
+
+      await expect(client.downloadFile(params)).rejects.toThrow(
+        "Failed to download file: File is not available",
+      );
+    });
+
+    it("rejects successful responses that do not contain a URL", async () => {
+      request.get.mockResolvedValue(successResponse({}));
+
+      await expect(client.downloadFile(params)).rejects.toThrow(
+        "Failed to download file: success response did not contain a URL",
+      );
+    });
   });
 
   it("creates a workspace", async () => {
@@ -354,5 +449,38 @@ describe("AnyDBClient integration endpoints", () => {
         },
       },
     );
+  });
+
+  it("removes an incomplete file record when upload setup fails", async () => {
+    const incompleteRecord = {
+      meta: { adoid: "incomplete-file" },
+    } as Awaited<ReturnType<AnyDBClient["createRecord"]>>;
+    const createRecord = jest
+      .spyOn(client, "createRecord")
+      .mockResolvedValue(incompleteRecord);
+    jest
+      .spyOn(client, "getUploadUrl")
+      .mockRejectedValue(new Error("Upload URL unavailable"));
+    const removeRecord = jest
+      .spyOn(client, "removeRecord")
+      .mockResolvedValue(true);
+
+    await expect(
+      client.uploadFile({
+        filename: "tasks.txt",
+        fileContent: Buffer.from("tasks"),
+        teamid: "team",
+        adbid: "adb",
+        adoid: "parent",
+      }),
+    ).rejects.toThrow("Upload URL unavailable");
+
+    expect(createRecord).toHaveBeenCalled();
+    expect(removeRecord).toHaveBeenCalledWith({
+      adoid: "incomplete-file",
+      adbid: "adb",
+      teamid: "team",
+      removefromids: NULL_OBJECTID,
+    });
   });
 });
