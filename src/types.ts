@@ -245,6 +245,7 @@ export interface UploadFileParams {
   adoid: string;
   cellpos?: string;
   contentType?: string;
+  replace?: boolean;
 }
 
 export interface CreatePublicShareLinkParams {

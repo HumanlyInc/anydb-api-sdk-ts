@@ -79,7 +79,9 @@ describe("AnyDBClient integration endpoints", () => {
     };
 
     it("unwraps a URL string from the standard API response", async () => {
-      request.get.mockResolvedValue(successResponse("https://files.example/file"));
+      request.get.mockResolvedValue(
+        successResponse("https://files.example/file"),
+      );
 
       await expect(client.downloadFile(params)).resolves.toEqual({
         url: "https://files.example/file",
@@ -117,7 +119,9 @@ describe("AnyDBClient integration endpoints", () => {
         data: undefined,
       } as AxiosResponse);
 
-      await expect(client.downloadFile({ ...params, redirect: true })).resolves.toEqual({
+      await expect(
+        client.downloadFile({ ...params, redirect: true }),
+      ).resolves.toEqual({
         url: "https://files.example/file",
         redirect: true,
       });
@@ -482,5 +486,100 @@ describe("AnyDBClient integration endpoints", () => {
       teamid: "team",
       removefromids: NULL_OBJECTID,
     });
+  });
+
+  it("rejects an upload when a File child has the same name", async () => {
+    jest.spyOn(client, "listRecords").mockResolvedValue({
+      items: [{ adoid: "existing-file", name: "tasks.txt" } as any],
+      hasmore: false,
+    });
+    const createRecord = jest.spyOn(client, "createRecord");
+
+    await expect(
+      client.uploadFile({
+        filename: "tasks.txt",
+        fileContent: Buffer.from("tasks"),
+        teamid: "team",
+        adbid: "adb",
+        adoid: "parent",
+      }),
+    ).rejects.toThrow(
+      'A file named "tasks.txt" already exists under record parent',
+    );
+
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it("deletes every same-name File child before a replacement upload", async () => {
+    const listRecords = jest
+      .spyOn(client, "listRecords")
+      .mockResolvedValueOnce({
+        items: [{ adoid: "other-file", name: "other.txt" } as any],
+        hasmore: true,
+        lastmarker: "next-page",
+      })
+      .mockResolvedValueOnce({
+        items: [
+          { adoid: "existing-file-1", name: "tasks.txt" } as any,
+          { adoid: "existing-file-2", name: "tasks.txt" } as any,
+        ],
+        hasmore: false,
+      });
+    const removeRecord = jest
+      .spyOn(client, "removeRecord")
+      .mockResolvedValue(true);
+    const createRecord = jest
+      .spyOn(client, "createRecord")
+      .mockResolvedValue({ meta: { adoid: "new-file" } } as any);
+    jest.spyOn(client, "getUploadUrl").mockResolvedValue("https://upload");
+    jest.spyOn(client, "uploadFileToUrl").mockResolvedValue();
+    jest.spyOn(client, "completeUpload").mockResolvedValue(true);
+
+    await expect(
+      client.uploadFile({
+        filename: "tasks.txt",
+        fileContent: Buffer.from("replacement"),
+        teamid: "team",
+        adbid: "adb",
+        adoid: "parent",
+        replace: true,
+      }),
+    ).resolves.toBe("new-file");
+
+    expect(listRecords).toHaveBeenNthCalledWith(
+      1,
+      "team",
+      "adb",
+      "parent",
+      "222222222222222222222222",
+      undefined,
+      "100",
+      undefined,
+    );
+    expect(listRecords).toHaveBeenNthCalledWith(
+      2,
+      "team",
+      "adb",
+      "parent",
+      "222222222222222222222222",
+      undefined,
+      "100",
+      "next-page",
+    );
+    expect(removeRecord).toHaveBeenNthCalledWith(1, {
+      adoid: "existing-file-1",
+      adbid: "adb",
+      teamid: "team",
+      removefromids: NULL_OBJECTID,
+    });
+    expect(removeRecord).toHaveBeenNthCalledWith(2, {
+      adoid: "existing-file-2",
+      adbid: "adb",
+      teamid: "team",
+      removefromids: NULL_OBJECTID,
+    });
+    expect(removeRecord.mock.invocationCallOrder[1]).toBeLessThan(
+      createRecord.mock.invocationCallOrder[0],
+    );
   });
 });
