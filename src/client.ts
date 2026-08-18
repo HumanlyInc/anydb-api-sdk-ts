@@ -1183,6 +1183,39 @@ export class AnyDBClient {
     return true;
   }
 
+  private async findFileChildrenByName(
+    teamid: string,
+    adbid: string,
+    parentid: string,
+    filename: string,
+  ): Promise<ADORecord["meta"][]> {
+    const matches: ADORecord["meta"][] = [];
+    let lastmarker: string | undefined;
+
+    do {
+      const page = await this.listRecords(
+        teamid,
+        adbid,
+        parentid,
+        PredefinedTemplateAdoIds.FILE_TEMPLATE_ADOID,
+        undefined,
+        "100",
+        lastmarker,
+      );
+      matches.push(...page.items.filter((item) => item.name === filename));
+
+      if (!page.hasmore) break;
+      if (!page.lastmarker || page.lastmarker === lastmarker) {
+        throw new Error(
+          `Failed to inspect existing files named "${filename}": invalid pagination response`,
+        );
+      }
+      lastmarker = page.lastmarker;
+    } while (true);
+
+    return matches;
+  }
+
   // ============================================================================
   // Convenience Methods
   // ============================================================================
@@ -1201,6 +1234,7 @@ export class AnyDBClient {
    * @param params.adoid - Parent record ID (file will be attached as child)
    * @param params.cellpos - Cell position (default: "A1")
    * @param params.contentType - MIME type (optional)
+   * @param params.replace - Delete existing File children with the same name before uploading
    * @returns Promise resolving to adoid of the created file record
    */
   async uploadFile(params: UploadFileParams): Promise<string> {
@@ -1213,6 +1247,7 @@ export class AnyDBClient {
       adoid,
       cellpos = "A1",
       contentType,
+      replace = false,
     } = params;
 
     // Validate input: must provide either filepath or fileContent
@@ -1234,6 +1269,26 @@ export class AnyDBClient {
     }
 
     const filesize = this.getUploadContentLength(file).toString();
+
+    const existingFiles = await this.findFileChildrenByName(
+      teamid,
+      adbid,
+      adoid,
+      filename,
+    );
+    if (existingFiles.length > 0 && !replace) {
+      throw new Error(
+        `A file named "${filename}" already exists under record ${adoid}`,
+      );
+    }
+    for (const existingFile of existingFiles) {
+      await this.removeRecord({
+        adoid: existingFile.adoid,
+        adbid,
+        teamid,
+        removefromids: NULL_OBJECTID,
+      });
+    }
 
     // Step 1: Create a new record as a child of the provided adoid using FILE_TEMPLATE
     const fileRecord = await this.createRecord({
@@ -1281,8 +1336,14 @@ export class AnyDBClient {
           removefromids: NULL_OBJECTID,
         });
       } catch (cleanupError) {
-        const uploadMessage = uploadError instanceof Error ? uploadError.message : String(uploadError);
-        const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        const uploadMessage =
+          uploadError instanceof Error
+            ? uploadError.message
+            : String(uploadError);
+        const cleanupMessage =
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : String(cleanupError);
         throw new Error(
           `${uploadMessage}; cleanup of incomplete file record ${fileAdoid} failed: ${cleanupMessage}`,
         );
