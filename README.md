@@ -715,6 +715,26 @@ const fileAdoid = await client.uploadFile({
 console.log("File uploaded with ID:", fileAdoid);
 ```
 
+#### Replace File
+
+Replace the content of an existing File record. The record keeps the same ADOID, and its name is updated to match `filename`.
+
+```typescript
+const fileAdoid = await client.replaceFile({
+  filename: "updated-document.pdf",
+  fileContent: updatedFileBuffer, // Or use filepath in Node.js
+  teamid: "teamid",
+  adbid: "adbid",
+  adoid: "existingFileAdoid",
+  cellpos: "A1", // Optional, defaults to "A1"
+  contentType: "application/pdf", // Optional
+});
+
+console.log("File replaced with ID:", fileAdoid);
+```
+
+The server verifies update access and that `adoid` identifies a File record before allowing replacement.
+
 #### Browser Upload Example
 
 See [examples/browser-upload-example.ts](examples/browser-upload-example.ts) for a complete browser flow using:
