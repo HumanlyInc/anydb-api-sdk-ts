@@ -582,4 +582,93 @@ describe("AnyDBClient integration endpoints", () => {
       createRecord.mock.invocationCallOrder[0],
     );
   });
+
+  it("requests a server-guarded replacement upload URL", async () => {
+    request.get.mockResolvedValue(successResponse({ url: "https://upload" }));
+
+    await expect(
+      client.getUploadUrl({
+        filename: "replacement.txt",
+        teamid: "team",
+        adbid: "adb",
+        adoid: "file-record",
+        filesize: "11",
+        cellpos: "A1",
+        replaceFile: true,
+      }),
+    ).resolves.toBe("https://upload");
+
+    expect(request.get).toHaveBeenCalledWith("/integrations/ext/getuploadurl", {
+      params: {
+        filename: "replacement.txt",
+        teamid: "team",
+        adbid: "adb",
+        adoid: "file-record",
+        filesize: "11",
+        cellpos: "A1",
+        replace_file: true,
+      },
+    });
+  });
+
+  it("replaces the file on the supplied File record", async () => {
+    const getUploadUrl = jest
+      .spyOn(client, "getUploadUrl")
+      .mockResolvedValue("https://upload");
+    const uploadFileToUrl = jest
+      .spyOn(client, "uploadFileToUrl")
+      .mockResolvedValue();
+    const completeUpload = jest
+      .spyOn(client, "completeUpload")
+      .mockResolvedValue(true);
+    const updateRecord = jest
+      .spyOn(client, "updateRecord")
+      .mockResolvedValue({ meta: { adoid: "file-record" } } as any);
+    const createRecord = jest.spyOn(client, "createRecord");
+    const content = Buffer.from("replacement");
+
+    await expect(
+      client.replaceFile({
+        filename: "replacement.txt",
+        fileContent: content,
+        teamid: "team",
+        adbid: "adb",
+        adoid: "file-record",
+      }),
+    ).resolves.toBe("file-record");
+
+    expect(getUploadUrl).toHaveBeenCalledWith({
+      filename: "replacement.txt",
+      teamid: "team",
+      adbid: "adb",
+      adoid: "file-record",
+      filesize: String(content.length),
+      cellpos: "A1",
+      replaceFile: true,
+    });
+    expect(uploadFileToUrl).toHaveBeenCalledWith(
+      "https://upload",
+      content,
+      undefined,
+    );
+    expect(completeUpload).toHaveBeenCalledWith({
+      filesize: String(content.length),
+      teamid: "team",
+      adbid: "adb",
+      adoid: "file-record",
+      cellpos: "A1",
+    });
+    expect(updateRecord).toHaveBeenCalledWith({
+      meta: {
+        adoid: "file-record",
+        adbid: "adb",
+        teamid: "team",
+        name: "replacement.txt",
+      },
+    });
+    expect(completeUpload.mock.invocationCallOrder[0]).toBeLessThan(
+      updateRecord.mock.invocationCallOrder[0],
+    );
+    expect(createRecord).not.toHaveBeenCalled();
+  });
 });

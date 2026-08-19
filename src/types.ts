@@ -219,6 +219,7 @@ export interface GetUploadUrlParams {
   adoid: string;
   filesize: string;
   cellpos?: string;
+  replaceFile?: boolean;
 }
 
 export interface GetUploadUrlResponse {
@@ -246,6 +247,17 @@ export interface UploadFileParams {
   cellpos?: string;
   contentType?: string;
   replace?: boolean;
+}
+
+export interface ReplaceFileParams {
+  filename: string;
+  filepath?: string;
+  fileContent?: UploadFileContent;
+  teamid: string;
+  adbid: string;
+  adoid: string;
+  cellpos?: string;
+  contentType?: string;
 }
 
 export interface CreatePublicShareLinkParams {
