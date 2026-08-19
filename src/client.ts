@@ -21,6 +21,7 @@ import type {
   CompleteUploadParams,
   UploadFileContent,
   UploadFileParams,
+  ReplaceFileParams,
   CreatePublicShareLinkParams,
   PublicShareLinkResponse,
   CreatePrivateShareLinkParams,
@@ -1100,15 +1101,19 @@ export class AnyDBClient {
    * Request a pre-signed URL to upload a file
    */
   async getUploadUrl(params: GetUploadUrlParams): Promise<string> {
+    const queryParams: Record<string, string | boolean | undefined> = {
+      filename: params.filename,
+      teamid: params.teamid,
+      adbid: params.adbid,
+      adoid: params.adoid,
+      filesize: params.filesize,
+      cellpos: params.cellpos,
+    };
+    if (params.replaceFile) {
+      queryParams.replace_file = true;
+    }
     const response = await this.client.get("/integrations/ext/getuploadurl", {
-      params: {
-        filename: params.filename,
-        teamid: params.teamid,
-        adbid: params.adbid,
-        adoid: params.adoid,
-        filesize: params.filesize,
-        cellpos: params.cellpos,
-      },
+      params: queryParams,
     });
     if (response.data.status !== "success") {
       throw new Error(
@@ -1216,6 +1221,21 @@ export class AnyDBClient {
     return matches;
   }
 
+  private async resolveUploadContent(
+    filepath?: string,
+    fileContent?: UploadFileContent,
+  ): Promise<UploadFileContent> {
+    if (!filepath && !fileContent) {
+      throw new Error("Either filepath or fileContent must be provided");
+    }
+    if (filepath && fileContent) {
+      throw new Error(
+        "Cannot provide both filepath and fileContent. Choose one.",
+      );
+    }
+    return filepath ? this.readFileFromPath(filepath) : fileContent!;
+  }
+
   // ============================================================================
   // Convenience Methods
   // ============================================================================
@@ -1250,23 +1270,7 @@ export class AnyDBClient {
       replace = false,
     } = params;
 
-    // Validate input: must provide either filepath or fileContent
-    if (!filepath && !fileContent) {
-      throw new Error("Either filepath or fileContent must be provided");
-    }
-    if (filepath && fileContent) {
-      throw new Error(
-        "Cannot provide both filepath and fileContent. Choose one.",
-      );
-    }
-
-    // Read file content if filepath is provided
-    let file: UploadFileContent;
-    if (filepath) {
-      file = await this.readFileFromPath(filepath);
-    } else {
-      file = fileContent!;
-    }
+    const file = await this.resolveUploadContent(filepath, fileContent);
 
     const filesize = this.getUploadContentLength(file).toString();
 
@@ -1350,5 +1354,43 @@ export class AnyDBClient {
       }
       throw uploadError;
     }
+  }
+
+  /**
+   * Replace the file referenced by an existing File record.
+   * The server verifies update access and rejects records not created from the
+   * predefined File template before changing file metadata. After completion,
+   * the File record name is updated to match the replacement filename.
+   */
+  async replaceFile(params: ReplaceFileParams): Promise<string> {
+    const {
+      filename,
+      filepath,
+      fileContent,
+      teamid,
+      adbid,
+      adoid,
+      cellpos = "A1",
+      contentType,
+    } = params;
+    const file = await this.resolveUploadContent(filepath, fileContent);
+    const filesize = this.getUploadContentLength(file).toString();
+
+    const url = await this.getUploadUrl({
+      filename,
+      teamid,
+      adbid,
+      adoid,
+      filesize,
+      cellpos,
+      replaceFile: true,
+    });
+    await this.uploadFileToUrl(url, file, contentType);
+    await this.completeUpload({ filesize, teamid, adbid, adoid, cellpos });
+    await this.updateRecord({
+      meta: { adoid, adbid, teamid, name: filename },
+    });
+
+    return adoid;
   }
 }

@@ -22,6 +22,7 @@ export type {
   CompleteUploadParams,
   UploadFileContent,
   UploadFileParams,
+  ReplaceFileParams,
   CreatePublicShareLinkParams,
   PublicShareLinkResponse,
   CreatePrivateShareLinkParams,
