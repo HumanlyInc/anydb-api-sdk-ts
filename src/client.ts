@@ -81,6 +81,51 @@ import {
   PUBLIC_USER_ID,
 } from "./types.js";
 
+
+/**
+ * Identifies this SDK to the AnyDB server.
+ *
+ * Kept as a literal rather than read from package.json: the SDK is bundled for
+ * both Node and the browser, and a JSON import would need resolveJsonModule
+ * plus a bundler that inlines it. Bump this with the package version.
+ */
+export const SDK_NAME = "anydb-api-sdk-ts";
+export const SDK_VERSION = "1.4.3";
+
+/**
+ * Header the server reads to attribute a call to a first-party client.
+ *
+ * User-Agent carries the same string, but browsers forbid setting it and
+ * proxies rewrite it, so this is the one that reliably survives. Both are
+ * self-declared: the server treats them as telemetry, not as authentication.
+ */
+const CLIENT_HEADER = "x-anydb-client";
+
+function clientIdentity(): string {
+  const runtime =
+    typeof process !== "undefined" &&
+    typeof process.versions !== "undefined" &&
+    process.versions.node
+      ? ` (node/${process.versions.node})`
+      : "";
+  return `${SDK_NAME}/${SDK_VERSION}${runtime}`;
+}
+
+/**
+ * A browser rejects an attempt to set User-Agent and logs a console warning,
+ * so only send it where it is allowed. x-anydb-client goes out everywhere.
+ */
+function identityHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { [CLIENT_HEADER]: clientIdentity() };
+  const isNode =
+    !("window" in globalThis) &&
+    typeof process !== "undefined" &&
+    typeof process.versions !== "undefined" &&
+    Boolean(process.versions.node);
+  if (isNode) headers["User-Agent"] = clientIdentity();
+  return headers;
+}
+
 export class AnyDBClient {
   private client: AxiosInstance;
   private apiKey: string;
@@ -107,6 +152,7 @@ export class AnyDBClient {
         "Content-Type": "application/json",
         "x-anydb-api-key": this.apiKey,
         "x-anydb-email": this.userEmail,
+        ...identityHeaders(),
       },
       timeout: config.timeout || 30000,
     });
